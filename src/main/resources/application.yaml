@@ -18,7 +18,7 @@ spring:
     username: device
     # no default on purpose: with one the pod would start, turn Ready and consume nothing - cholewa.required-properties
     # refuses the start without the variable
-    password: password
+    password: ${rabbitmq-password}
     virtual-host: /device
     connection-timeout: 10s
     requested-heartbeat: 10s

@@ -1,6 +1,7 @@
 package cloud.cholewa.gate;
 
 import cloud.cholewa.commons.database.DatabaseProperties;
+import cloud.cholewa.gate.config.IntercomProperties;
 import cloud.cholewa.shelly.http.ShellyGen1Client;
 import cloud.cholewa.shelly.http.ShellyRpcClient;
 import cloud.cholewa.shelly.codec.ShellyMqttDecoder;
@@ -10,6 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,6 +24,8 @@ class GateServiceApplicationTest {
     private DatabaseProperties databaseProperties;
     @Autowired
     private ApplicationContext applicationContext;
+    @Autowired
+    private IntercomProperties intercomProperties;
 
     @Test
     void contextLoads() {
@@ -46,15 +51,30 @@ class GateServiceApplicationTest {
             .isEqualTo(10);
     }
 
-    //the password of the database has no default: the start is refused without it (cholewa.required-properties); the
-    //service has no other secret yet
+    //the passwords of the database and of the broker have no default: the start is refused without either
+    //(cholewa.required-properties)
     @Test
-    void should_require_the_password_of_the_database() {
+    void should_require_the_passwords_of_the_database_and_of_the_broker() {
         assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[0].property"))
             .isEqualTo("database.password");
         assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[0].variable"))
             .isEqualTo("database-password");
-        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[1].property")).isNull();
+        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[1].property"))
+            .isEqualTo("spring.rabbitmq.password");
+        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[1].variable"))
+            .isEqualTo("rabbitmq-password");
+        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[2].property")).isNull();
+    }
+
+    //the events of the door station (HAS-448): the queue of every device, the user device of /device, manual acks
+    @Test
+    void should_consume_the_device_queue_as_the_device_user_with_manual_acks() {
+        assertThat(applicationContext.getEnvironment().getProperty("spring.rabbitmq.username")).isEqualTo("device");
+        assertThat(applicationContext.getEnvironment().getProperty("spring.rabbitmq.virtual-host")).isEqualTo("/device");
+        assertThat(applicationContext.getEnvironment().getProperty("spring.rabbitmq.listener.simple.acknowledge-mode"))
+            .isEqualTo("manual");
+        assertThat(intercomProperties.device()).isEqualTo("gate");
+        assertThat(intercomProperties.bridgeZone()).isEqualTo(ZoneId.of("UTC"));
     }
 
 

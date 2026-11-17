@@ -1,0 +1,3 @@
+-- The baseline of the database home-automation-gate (HAS-446): no table yet - the tables come with the
+-- tasks that store something (the events of the intercom onwards, HAS-448). The first run proves the grant
+-- on the schema public: Flyway creates its history table there.

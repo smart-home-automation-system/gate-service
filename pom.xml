@@ -179,7 +179,7 @@
 			<artifactId>testcontainers-postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- the client of database-service is tested against it, never the legacy mockwebserver (JUnit 4) -->
+		<!-- the clients of database-service and of the Shelly of the gate (HAS-448, HAS-449) are tested against it, never the legacy mockwebserver (JUnit 4) -->
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>mockwebserver3</artifactId>

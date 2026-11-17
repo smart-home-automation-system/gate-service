@@ -36,5 +36,6 @@ first endpoints come with HAS-448 onwards.
 
 - Build: `mvn verify` (JDK 21).
 - Ports: local profile `6016` (management `8016`); in the cluster `6200` / `8200`.
-- Own database `home-automation-gate`, pool 2; `database-password` is mandatory
-  (`cholewa.required-properties`). **A local run with the real values is the production database.**
+- Own database `home-automation-gate`, pool 2: `database-host`, `database-port`, `database-name`, `database-user`,
+  `database-password` and `flyway-url`; `database-password` is mandatory (`cholewa.required-properties`), the rest
+  falls back to `localhost` / dummy values that fail on Flyway. **A local run with the real values is the production database.**

@@ -37,7 +37,8 @@ public class ScreenOpening {
             if (!HOUSEHOLDER.equals(unlockType) || !properties.screens().contains(number)) {
                 return Mono.empty();
             }
-            final Duration age = Duration.between(occurredAt, LocalDateTime.now(clock));
+            //instants in the zone of the house, so the age is right on the night the clocks change too
+            final Duration age = Duration.between(occurredAt.atZone(clock.getZone()).toInstant(), clock.instant());
             if (age.compareTo(properties.screen().maxAge()) > 0) {
                 return Mono.fromRunnable(() -> log.info(
                     "An unlock of the screen {} of {} is {} s old - the gate is not opened", number, occurredAt,

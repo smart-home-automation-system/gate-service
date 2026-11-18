@@ -12,6 +12,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -38,21 +39,23 @@ public class GateOpener {
     private final GateProperties properties;
     private final Clock clock;
 
-    //the moment the last command was sent to the Shelly, whatever it came to
-    private final AtomicReference<LocalDateTime> lastSent = new AtomicReference<>();
+    //the instant the last command was sent to the Shelly, whatever it came to - an instant, so the repeat is judged the
+    //same on the night the clocks go back
+    private final AtomicReference<Instant> lastSent = new AtomicReference<>();
 
     public Mono<Void> open(final Source source, final String member) {
         return Mono.defer(() -> {
-            final LocalDateTime now = LocalDateTime.now(clock);
+            final Instant instant = clock.instant();
+            final LocalDateTime now = LocalDateTime.ofInstant(instant, clock.getZone());
             final GateRegistry.GateState gate = gateRegistry.current().orElse(null);
             if (gate == null || !gate.safe()) {
-                return record(now, source, member, GateCommandEntity.UNAVAILABLE)
+                return logCommand(now, source, member, GateCommandEntity.UNAVAILABLE)
                     .then(Mono.error(new GateException.GateUnavailable(gate == null
                         ? "The registry knows no gate"
                         : "The relay of the gate does not switch itself off (auto_off " + gate.autoOff() + ")")));
             }
-            if (!reserve(now)) {
-                return record(now, source, member, GateCommandEntity.TOO_SOON)
+            if (!reserve(instant)) {
+                return logCommand(now, source, member, GateCommandEntity.TOO_SOON)
                     .then(Mono.error(new GateException.OpenTooSoon(properties.open().ignoreRepeatFor().toSeconds())));
             }
             final GateDevice device = gate.device();
@@ -60,22 +63,22 @@ public class GateOpener {
                 .timeout(COMMAND_TIMEOUT)
                 .then(Mono.defer(() -> {
                     log.info("The gate {} opened from {}{}", device.id(), source, member == null ? "" : " by " + member);
-                    return record(now, source, member, GateCommandEntity.OPENED);
+                    return logCommand(now, source, member, GateCommandEntity.OPENED);
                 }))
                 .onErrorResume(failure -> !(failure instanceof GateException), failure -> {
                     log.warn("The Shelly of the gate {} did not take the opening from {} - it may have moved all the same: {}",
                         device.id(), source, failure.toString());
-                    return record(now, source, member, GateCommandEntity.FAILED)
+                    return logCommand(now, source, member, GateCommandEntity.FAILED)
                         .then(Mono.error(new GateException.DeviceFailed(failure.getClass().getSimpleName())));
                 });
         });
     }
 
     //the slot of a command: refused while the last command sent is younger than ignore-repeat-for
-    private boolean reserve(final LocalDateTime now) {
+    private boolean reserve(final Instant now) {
         final Duration repeat = properties.open().ignoreRepeatFor();
         while (true) {
-            final LocalDateTime last = lastSent.get();
+            final Instant last = lastSent.get();
             if (last != null && now.isBefore(last.plus(repeat))) {
                 return false;
             }
@@ -85,7 +88,7 @@ public class GateOpener {
         }
     }
 
-    private Mono<Void> record(final LocalDateTime at, final Source source, final String member, final String outcome) {
+    private Mono<Void> logCommand(final LocalDateTime at, final Source source, final String member, final String outcome) {
         return repository.save(GateCommandEntity.of(at, source.name(), member, outcome))
             .timeout(WRITE_TIMEOUT)
             .then()

@@ -14,13 +14,16 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 //The Shelly of the gate (HAS-449): the device of the registry (the kind gate) and the auto_off of its relay, read at the
 //start and every five minutes. A failed read of the registry keeps the gate read before (a WARN); a failed read of the
 //device makes it unreachable and its auto_off not known - so not safe to command. Until the first read nothing is
-//known. The registry holds one gate; with more, the lowest id is driven and the rest named in a WARN
+//known. The registry holds one gate; with more, the lowest id is driven and the rest named in a WARN. The door station
+//(the kind intercom, HAS-452) is read in the same pass, on its own: its id and name are the subject of a ring told to the
+//household; a failed read keeps the one read before, the lowest id of more is taken
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -33,6 +36,7 @@ public class GateRegistry {
     private final GateSettingsClient gateSettingsClient;
     private final Clock clock;
     private final AtomicReference<GateState> state = new AtomicReference<>();
+    private final AtomicReference<IntercomDevice> intercom = new AtomicReference<>();
 
     //the gate and what the last read of it said: autoOff null and reachable false when the device did not answer
     public record GateState(GateDevice device, Double autoOff, boolean reachable, LocalDateTime checkedAt) {
@@ -49,7 +53,34 @@ public class GateRegistry {
     }
 
     Mono<Void> refreshOnce() {
-        return deviceRegistryClient.getGates()
+        return Mono.when(refreshGate(), refreshIntercom());
+    }
+
+    private Mono<Void> refreshIntercom() {
+        return Mono.defer(deviceRegistryClient::getIntercoms)
+            .map(devices -> devices.stream()
+                .filter(device -> !Boolean.FALSE.equals(device.getEnabled()))
+                .map(IntercomDevice::of)
+                .flatMap(Optional::stream)
+                .min(Comparator.comparingLong(IntercomDevice::id)))
+            .doOnNext(read -> {
+                final IntercomDevice before = intercom.getAndSet(read.orElse(null));
+                if (!Objects.equals(before, read.orElse(null))) {
+                    log.info("The door station of the registry: {}", read.map(IntercomDevice::id).orElse(null));
+                }
+            })
+            .then()
+            .onErrorResume(failure -> Mono.fromRunnable(() -> log.warn(
+                "The door station of the registry could not be read, the last one is kept: {}", failure.toString())));
+    }
+
+    //the door station of the registry, or nothing before the first read found one
+    public Optional<IntercomDevice> currentIntercom() {
+        return Optional.ofNullable(intercom.get());
+    }
+
+    private Mono<Void> refreshGate() {
+        return Mono.defer(deviceRegistryClient::getGates)
             .map(GateRegistry::chosen)
             .flatMap(gate -> gate.map(this::check).orElseGet(() -> Mono.fromRunnable(this::forget)))
             .onErrorResume(failure -> Mono.fromRunnable(() -> log.warn(

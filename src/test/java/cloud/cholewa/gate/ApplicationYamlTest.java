@@ -24,5 +24,6 @@ class ApplicationYamlTest {
 
         assertThat(shared.getProperty("spring.rabbitmq.password")).hasToString("${rabbitmq-password}");
         assertThat(shared.getProperty("database.password")).hasToString("${database-password}");
+        assertThat(shared.getProperty("notification.password")).hasToString("${notification-rabbitmq-password}");
     }
 }

@@ -4,6 +4,8 @@ import cloud.cholewa.gate.config.GateProperties;
 import cloud.cholewa.gate.database.GateCommandEntity;
 import cloud.cholewa.gate.database.GateCommandRepository;
 import cloud.cholewa.gate.error.GateException;
+import cloud.cholewa.gate.household.HouseholdNotifier;
+import cloud.cholewa.home.model.GateOpenSource;
 import cloud.cholewa.shelly.http.ShellyGen1Client;
 import cloud.cholewa.shelly.model.Relay;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +39,7 @@ class GateOpenerTest {
 
     private static final ZoneId HOUSE = ZoneId.of("Europe/Warsaw");
     private static final Instant START = Instant.parse("2026-11-18T08:00:00Z");
-    private static final GateDevice GATE = new GateDevice(147L, "192.0.2.85", 0);
+    private static final GateDevice GATE = new GateDevice(147L, "Gate", "192.0.2.85", 0);
     private static final GateRegistry.GateState SAFE =
         new GateRegistry.GateState(GATE, 1.0, true, LocalDateTime.of(2026, 11, 18, 8, 55));
     private static final GateProperties PROPERTIES = new GateProperties(List.of("10010110001"),
@@ -46,14 +48,38 @@ class GateOpenerTest {
     private final GateRegistry gateRegistry = mock(GateRegistry.class);
     private final ShellyGen1Client shelly = mock(ShellyGen1Client.class);
     private final GateCommandRepository repository = mock(GateCommandRepository.class);
+    private final HouseholdNotifier notifier = mock(HouseholdNotifier.class);
     private final MovableClock clock = new MovableClock(START);
-    private final GateOpener opener = new GateOpener(gateRegistry, shelly, repository, PROPERTIES, clock);
+    private final GateOpener opener = new GateOpener(gateRegistry, shelly, repository, notifier, PROPERTIES, clock);
 
     @BeforeEach
     void setUp() {
         when(gateRegistry.current()).thenReturn(Optional.of(SAFE));
         when(shelly.relay(anyString(), anyInt(), anyBoolean())).thenReturn(Mono.just(mock(Relay.class)));
         when(repository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(notifier.gateOpened(any(), any(), any(), any())).thenReturn(Mono.empty());
+    }
+
+    //HAS-452: a pulse the Shelly took is told to the household, with where from and who
+    @Test
+    void should_tell_the_household_of_an_opening_the_shelly_took() {
+        opener.open(GateOpener.Source.DASHBOARD, "Anna").as(StepVerifier::create).verifyComplete();
+        clock.moveBy(Duration.ofSeconds(20));
+        opener.open(GateOpener.Source.SCREEN, null).as(StepVerifier::create).verifyComplete();
+
+        verify(notifier).gateOpened(GATE, GateOpenSource.DASHBOARD, "Anna", LocalDateTime.of(2026, 11, 18, 9, 0));
+        verify(notifier).gateOpened(GATE, GateOpenSource.SCREEN, null, LocalDateTime.of(2026, 11, 18, 9, 0, 20));
+    }
+
+    //nothing is told of an opening refused or not taken
+    @Test
+    void should_tell_nothing_of_an_opening_that_did_not_happen() {
+        when(shelly.relay(anyString(), anyInt(), anyBoolean())).thenReturn(Mono.error(new IllegalStateException("timeout")));
+
+        opener.open(GateOpener.Source.SCREEN, null).as(StepVerifier::create).verifyError(GateException.DeviceFailed.class);
+        opener.open(GateOpener.Source.SCREEN, null).as(StepVerifier::create).verifyError(GateException.OpenTooSoon.class);
+
+        verify(notifier, never()).gateOpened(any(), any(), any(), any());
     }
 
     //one "turn on" of the relay of its channel - the auto_off of the relay ends the pulse

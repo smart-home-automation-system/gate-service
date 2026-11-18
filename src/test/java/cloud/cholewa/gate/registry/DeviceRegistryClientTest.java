@@ -63,6 +63,24 @@ class DeviceRegistryClientTest {
         assertThat(request.getUrl().queryParameter("enabled")).isEqualTo("true");
     }
 
+    //HAS-452: the door station, the subject of a ring told to the household
+    @Test
+    void should_read_the_switched_on_door_stations() throws InterruptedException {
+        server.enqueue(json("""
+            [{"id":146,"name":"Intercom","room":"garden","kind":"intercom","enabled":true,"vendor":"hikvision",
+              "hikvision":{"address":"192.0.2.93","serialNumber":"DS-KV6113-WPE1(B)0120210415RRF00000000"}}]
+            """));
+
+        client.getIntercoms().as(StepVerifier::create)
+            .assertNext(devices -> assertThat(devices).singleElement().satisfies(device -> {
+                assertThat(device.getId()).isEqualTo(146L);
+                assertThat(device.getName()).isEqualTo("Intercom");
+            }))
+            .verifyComplete();
+
+        assertThat(server.takeRequest().getUrl().queryParameter("kind")).isEqualTo("intercom");
+    }
+
     @Test
     void should_read_an_empty_list_as_no_gate() {
         server.enqueue(json("[]"));

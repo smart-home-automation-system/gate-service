@@ -1,8 +1,10 @@
 package cloud.cholewa.gate.api;
 
+import cloud.cholewa.gate.api.model.GateEvent;
 import cloud.cholewa.gate.api.model.GateReply;
 import cloud.cholewa.gate.config.ExceptionHandlerConfig;
 import cloud.cholewa.gate.error.GateException;
+import cloud.cholewa.gate.events.GateEventService;
 import cloud.cholewa.gate.gate.GateService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
@@ -35,6 +38,9 @@ class GateControllerTest {
 
     @MockitoBean
     private GateService gateService;
+
+    @MockitoBean
+    private GateEventService gateEventService;
 
     @Test
     void should_open_the_gate_from_the_dashboard() {
@@ -88,5 +94,47 @@ class GateControllerTest {
             .jsonPath("$.lastRing.at").isEqualTo("2026-11-18T08:59:00")
             .jsonPath("$.lastRing.button").doesNotExist()
             .jsonPath("$.lastOpening").doesNotExist();
+    }
+
+    private static final LocalDateTime FROM = LocalDateTime.of(2026, 11, 18, 0, 0);
+    private static final LocalDateTime TO = LocalDateTime.of(2026, 11, 19, 0, 0);
+
+    //HAS-450: the timeline in the time of the house, a field not of its kind left out
+    @Test
+    void should_read_the_events_of_a_period() {
+        when(gateEventService.events(FROM, TO)).thenReturn(Flux.just(
+            new GateEvent(GateEvent.COMMAND, LocalDateTime.of(2026, 11, 18, 10, 56, 9), null, null, null, null, "screen",
+                null, "opened"),
+            new GateEvent(GateEvent.UNLOCK, LocalDateTime.of(2026, 11, 18, 10, 56, 9), null, 1, "HOUSEHOLDER",
+                "10010110001", null, null, null)));
+
+        webTestClient.get().uri("/events?from=2026-11-18T00:00:00&to=2026-11-19T00:00:00").exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(2)
+            .jsonPath("$[0].kind").isEqualTo("command")
+            .jsonPath("$[0].source").isEqualTo("screen")
+            .jsonPath("$[0].member").doesNotExist()
+            .jsonPath("$[0].door").doesNotExist()
+            .jsonPath("$[1].kind").isEqualTo("unlock")
+            .jsonPath("$[1].at").isEqualTo("2026-11-18T10:56:09")
+            .jsonPath("$[1].screen").isEqualTo("10010110001");
+    }
+
+    @Test
+    void should_answer_an_invalid_period_with_its_code() {
+        when(gateEventService.events(TO, FROM)).thenReturn(Flux.error(new GateException.InvalidRange("from must be before to")));
+
+        webTestClient.get().uri("/events?from=2026-11-19T00:00:00&to=2026-11-18T00:00:00").exchange()
+            .expectStatus().isBadRequest()
+            .expectBody().jsonPath("$.errors[0].code").isEqualTo("INVALID_RANGE");
+    }
+
+    @Test
+    void should_refuse_a_period_without_both_ends_or_not_a_time() {
+        webTestClient.get().uri("/events?from=2026-11-18T00:00:00").exchange().expectStatus().isBadRequest();
+        webTestClient.get().uri("/events?from=yesterday&to=2026-11-18T00:00:00").exchange().expectStatus().isBadRequest();
+
+        verify(gateEventService, never()).events(any(), any());
     }
 }

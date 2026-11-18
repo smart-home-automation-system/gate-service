@@ -19,7 +19,7 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
 
-//The error contract of the organization (cholewa-commons) with one processor per cause of a refused request (HAS-449)
+//The error contract of the organization (cholewa-commons) with one processor per cause of a refused request (HAS-449, HAS-450)
 @Configuration
 public class ExceptionHandlerConfig {
 
@@ -40,7 +40,8 @@ public class ExceptionHandlerConfig {
             GateException.GateUnavailable.class,
             new DomainExceptionProcessor(SERVICE_UNAVAILABLE, GateError.GATE_UNAVAILABLE),
             GateException.RegistryUnavailable.class,
-            new DomainExceptionProcessor(BAD_GATEWAY, GateError.REGISTRY_UNAVAILABLE)
+            new DomainExceptionProcessor(BAD_GATEWAY, GateError.REGISTRY_UNAVAILABLE),
+            GateException.InvalidRange.class, new DomainExceptionProcessor(BAD_REQUEST, GateError.INVALID_RANGE)
         ));
     }
 }

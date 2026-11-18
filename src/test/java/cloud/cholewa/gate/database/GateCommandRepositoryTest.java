@@ -82,4 +82,32 @@ class GateCommandRepositoryTest {
         repository.save(GateCommandEntity.of(AT, "DASHBOARD", null, GateCommandEntity.OPENED))
             .as(StepVerifier::create).verifyError(DataIntegrityViolationException.class);
     }
+
+    //HAS-450: from included, to not, the newest first
+    @Test
+    void should_read_the_commands_of_a_period_newest_first() {
+        repository.save(GateCommandEntity.of(AT.minusSeconds(1), "SCREEN", null, GateCommandEntity.OPENED))
+            .then(repository.save(GateCommandEntity.of(AT, "SCREEN", null, GateCommandEntity.OPENED)))
+            .then(repository.save(GateCommandEntity.of(AT.plusMinutes(1), "DASHBOARD", "Anna", GateCommandEntity.TOO_SOON)))
+            .then(repository.save(GateCommandEntity.of(AT.plusMinutes(2), "SCREEN", null, GateCommandEntity.OPENED)))
+            .thenMany(repository.findInPeriod(AT, AT.plusMinutes(2)))
+            .map(GateCommandEntity::outcome)
+            .collectList()
+            .as(StepVerifier::create)
+            .assertNext(outcomes -> assertThat(outcomes).containsExactly(GateCommandEntity.TOO_SOON, GateCommandEntity.OPENED))
+            .verifyComplete();
+    }
+
+    //HAS-450: the retention deletes what is older than its bound, not the command at it
+    @Test
+    void should_delete_the_commands_before_a_bound() {
+        repository.save(GateCommandEntity.of(AT.minusSeconds(1), "SCREEN", null, GateCommandEntity.OPENED))
+            .then(repository.save(GateCommandEntity.of(AT, "SCREEN", null, GateCommandEntity.FAILED)))
+            .then(repository.deleteBefore(AT))
+            .as(StepVerifier::create).expectNext(1L).verifyComplete();
+
+        repository.findAll().map(GateCommandEntity::outcome).collectList().as(StepVerifier::create)
+            .assertNext(outcomes -> assertThat(outcomes).containsExactly(GateCommandEntity.FAILED))
+            .verifyComplete();
+    }
 }

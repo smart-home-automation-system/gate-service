@@ -38,6 +38,12 @@ public abstract class GateException extends RuntimeException {
         }
     }
 
+    public static final class InvalidRange extends GateException {
+        public InvalidRange(final String reason) {
+            super(GateError.INVALID_RANGE, reason);
+        }
+    }
+
     public static final class RegistryUnavailable extends GateException {
         public RegistryUnavailable() {
             super(GateError.REGISTRY_UNAVAILABLE, "The household profiles could not be read");

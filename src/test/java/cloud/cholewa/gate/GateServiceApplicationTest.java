@@ -2,6 +2,7 @@ package cloud.cholewa.gate;
 
 import cloud.cholewa.commons.database.DatabaseProperties;
 import cloud.cholewa.gate.config.GateProperties;
+import cloud.cholewa.gate.config.GateRetentionProperties;
 import cloud.cholewa.gate.config.IntercomProperties;
 import cloud.cholewa.shelly.http.ShellyGen1Client;
 import cloud.cholewa.shelly.http.ShellyRpcClient;
@@ -30,6 +31,8 @@ class GateServiceApplicationTest {
     private IntercomProperties intercomProperties;
     @Autowired
     private GateProperties gateProperties;
+    @Autowired
+    private GateRetentionProperties retentionProperties;
 
     @Test
     void contextLoads() {
@@ -97,5 +100,11 @@ class GateServiceApplicationTest {
         assertThat(applicationContext.getBeanNamesForType(ShellyRpcClient.class)).hasSize(1);
         assertThat(applicationContext.getBeanNamesForType(ShellyGen1Client.class)).hasSize(1);
         assertThat(applicationContext.getBeanNamesForType(ShellyMqttDecoder.class)).hasSize(1);
+    }
+
+    //HAS-450: the log of the gate is kept 90 days - bound in days, never milliseconds
+    @Test
+    void should_keep_the_log_of_the_gate_90_days() {
+        assertThat(retentionProperties.retention()).isEqualTo(Duration.ofDays(90));
     }
 }

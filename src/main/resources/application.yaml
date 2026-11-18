@@ -72,6 +72,8 @@ gate:
     ignore-repeat-for: 15s
   screen:
     max-age: 60s
+  # the events and the commands older than it are deleted every night at 03:40 (HAS-450)
+  retention: 90d
 
 internal:
   service:

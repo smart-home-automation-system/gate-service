@@ -74,6 +74,20 @@ gate:
     max-age: 60s
   # the events and the commands older than it are deleted every night at 03:40 (HAS-450)
   retention: 90d
+  # a ring told to the household (HAS-452): once per call of the station - none again within this of the last told
+  doorbell:
+    ignore-repeat-for: 60s
+
+# the household told of a ring and an opening (HAS-452): a second connection, to /notification - the exchange lives on
+# another virtual host than the device events (NotificationRabbitConfig). cholewa.notification.enabled of
+# cholewa-commons stays unset: its publisher uses the connection to /device
+notification:
+  virtual-host: /notification
+  username: notification
+  # no default on purpose: cholewa.required-properties refuses the start without the variable
+  password: ${notification-rabbitmq-password}
+  exchange: notification
+  env: prod
 
 internal:
   service:
@@ -87,6 +101,8 @@ cholewa:
       variable: database-password
     - property: spring.rabbitmq.password
       variable: rabbitmq-password
+    - property: notification.password
+      variable: notification-rabbitmq-password
 
 server:
   port: 6200
@@ -135,6 +151,9 @@ rabbitmq:
   queue:
     name: device.dev.gate
 
+notification:
+  env: dev
+
 internal:
   service:
     database: http://localhost:6005
@@ -171,6 +190,11 @@ spring:
 rabbitmq:
   queue:
     name: device.test.gate
+
+# "test" matches no binding of the exchange: such a message would come back as unroutable
+notification:
+  password: dummyPassword
+  env: test
 
 # database-service at an address nothing listens on: a context test never reads the registry of the house
 internal:

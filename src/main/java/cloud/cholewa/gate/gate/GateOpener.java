@@ -4,6 +4,8 @@ import cloud.cholewa.gate.config.GateProperties;
 import cloud.cholewa.gate.database.GateCommandEntity;
 import cloud.cholewa.gate.database.GateCommandRepository;
 import cloud.cholewa.gate.error.GateException;
+import cloud.cholewa.gate.household.HouseholdNotifier;
+import cloud.cholewa.home.model.GateOpenSource;
 import cloud.cholewa.shelly.http.ShellyGen1Client;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 //stops or reverses it), so an opening within gate.open.ignore-repeat-for of the last command sent is refused - the slot
 //is taken before the command, so two requests at once send one pulse. Nothing is sent while the gate is not known or its
 //relay does not switch itself off. Every opening is logged in gate_command; a failed write of that row never fails the
-//opening
+//opening. A pulse the Shelly took is told to the household (HAS-452) - never failing nor holding the opening for long
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -36,6 +38,7 @@ public class GateOpener {
     private final GateRegistry gateRegistry;
     private final ShellyGen1Client shellyGen1Client;
     private final GateCommandRepository repository;
+    private final HouseholdNotifier householdNotifier;
     private final GateProperties properties;
     private final Clock clock;
 
@@ -63,7 +66,8 @@ public class GateOpener {
                 .timeout(COMMAND_TIMEOUT)
                 .then(Mono.defer(() -> {
                     log.info("The gate {} opened from {}{}", device.id(), source, member == null ? "" : " by " + member);
-                    return logCommand(now, source, member, GateCommandEntity.OPENED);
+                    return logCommand(now, source, member, GateCommandEntity.OPENED)
+                        .then(householdNotifier.gateOpened(device, sourceOf(source), member, now));
                 }))
                 .onErrorResume(failure -> !(failure instanceof GateException), failure -> {
                     log.warn("The Shelly of the gate {} did not take the opening from {} - it may have moved all the same: {}",
@@ -72,6 +76,13 @@ public class GateOpener {
                         .then(Mono.error(new GateException.DeviceFailed(failure.getClass().getSimpleName())));
                 });
         });
+    }
+
+    private static GateOpenSource sourceOf(final Source source) {
+        return switch (source) {
+            case SCREEN -> GateOpenSource.SCREEN;
+            case DASHBOARD -> GateOpenSource.DASHBOARD;
+        };
     }
 
     //the slot of a command: refused while the last command sent is younger than ignore-repeat-for

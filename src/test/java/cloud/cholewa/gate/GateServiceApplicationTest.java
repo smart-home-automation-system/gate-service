@@ -1,6 +1,7 @@
 package cloud.cholewa.gate;
 
 import cloud.cholewa.commons.database.DatabaseProperties;
+import cloud.cholewa.gate.config.DoorbellProperties;
 import cloud.cholewa.gate.config.GateProperties;
 import cloud.cholewa.gate.config.GateRetentionProperties;
 import cloud.cholewa.gate.config.IntercomProperties;
@@ -32,6 +33,8 @@ class GateServiceApplicationTest {
     @Autowired
     private GateProperties gateProperties;
     @Autowired
+    private DoorbellProperties doorbellProperties;
+    @Autowired
     private GateRetentionProperties retentionProperties;
 
     @Test
@@ -58,7 +61,7 @@ class GateServiceApplicationTest {
             .isEqualTo(10);
     }
 
-    //the passwords of the database and of the broker have no default: the start is refused without either
+    //the passwords of the database and of both connections to the broker have no default: the start is refused without either
     //(cholewa.required-properties)
     @Test
     void should_require_the_passwords_of_the_database_and_of_the_broker() {
@@ -70,7 +73,11 @@ class GateServiceApplicationTest {
             .isEqualTo("spring.rabbitmq.password");
         assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[1].variable"))
             .isEqualTo("rabbitmq-password");
-        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[2].property")).isNull();
+        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[2].property"))
+            .isEqualTo("notification.password");
+        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[2].variable"))
+            .isEqualTo("notification-rabbitmq-password");
+        assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[3].property")).isNull();
     }
 
     //the opening of the gate (HAS-449): the screen of the house, the repeat of 15 s and the age of 60 s - both durations
@@ -106,5 +113,11 @@ class GateServiceApplicationTest {
     @Test
     void should_keep_the_log_of_the_gate_90_days() {
         assertThat(retentionProperties.retention()).isEqualTo(Duration.ofDays(90));
+    }
+
+    //HAS-452: a ring told once per call of the station - 60 s, bound in seconds, never milliseconds
+    @Test
+    void should_tell_a_ring_once_per_call() {
+        assertThat(doorbellProperties.ignoreRepeatFor()).isEqualTo(Duration.ofSeconds(60));
     }
 }

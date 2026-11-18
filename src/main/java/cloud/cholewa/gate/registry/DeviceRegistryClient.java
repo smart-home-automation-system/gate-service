@@ -13,7 +13,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-//The switched-on gates of the device registry of database-service (the kind gate, smart-home-sdk 1.22.0). What a
+//The switched-on gates and door stations (the kind intercom, HAS-452) of the device registry of database-service (the kind gate, smart-home-sdk 1.22.0). What a
 //failing database-service says goes to the log, never further; no body at all, or one that is not a list, is a failed
 //call - never an empty registry, which would forget the gate. The shape of the client of appliance-service
 @Slf4j
@@ -30,19 +30,27 @@ public class DeviceRegistryClient {
     }
 
     public Mono<List<SmartDevice>> getGates() {
+        return getDevices(DeviceKind.GATE, "gates");
+    }
+
+    public Mono<List<SmartDevice>> getIntercoms() {
+        return getDevices(DeviceKind.INTERCOM, "door stations");
+    }
+
+    private Mono<List<SmartDevice>> getDevices(final DeviceKind kind, final String what) {
         return databaseServiceWebClient
             .get()
             .uri(uriBuilder -> uriBuilder
                 .path("/home/device/registry")
-                .queryParam("kind", DeviceKind.GATE.getValue())
+                .queryParam("kind", kind.getValue())
                 .queryParam("enabled", true)
                 .build()
             )
             .retrieve()
             .onStatus(HttpStatusCode::isError, response -> DownstreamErrors.read(response)
                 .map(error -> {
-                    log.warn("database-service answered {} to the read of the gates: {}",
-                        error.status().value(), error.errors());
+                    log.warn("database-service answered {} to the read of the {}: {}",
+                        error.status().value(), what, error.errors());
                     return new RegistryCallException("database-service answered " + error.status().value());
                 }))
             .bodyToMono(DEVICES)

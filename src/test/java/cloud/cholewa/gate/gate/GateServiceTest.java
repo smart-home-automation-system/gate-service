@@ -83,7 +83,7 @@ class GateServiceTest {
     @Test
     void should_read_the_gate_the_bridge_the_last_ring_and_the_last_opening() {
         when(gateRegistry.current()).thenReturn(Optional.of(
-            new GateRegistry.GateState(new GateDevice(147, "192.0.2.85", 0), 1.0, true, AT)));
+            new GateRegistry.GateState(new GateDevice(147, "Gate", "192.0.2.85", 0), 1.0, true, AT)));
         bridge.report("Call-state", "online", AT);
         when(events.findFirstByKindOrderByOccurredAtDesc(IntercomEventEntity.RING))
             .thenReturn(Mono.just(IntercomEventEntity.ring(AT.minusMinutes(3), "10010100000")));

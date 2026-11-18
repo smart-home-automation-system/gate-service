@@ -38,6 +38,30 @@ class GateRegistryTest {
     @Test
     void should_know_nothing_before_the_first_read() {
         assertThat(registry.current()).isEmpty();
+        assertThat(registry.currentIntercom()).isEmpty();
+    }
+
+    private static SmartDevice station(final long id, final Boolean enabled) {
+        return SmartDevice.builder().id(id).name("Intercom").kind(DeviceKind.INTERCOM).enabled(enabled).build();
+    }
+
+    //HAS-452: the door station of the registry, read in the same pass - the lowest id of the switched-on ones; a failed
+    //read keeps it, and never keeps the gate from being read
+    @Test
+    void should_keep_the_door_station_of_the_registry() {
+        when(registryClient.getGates()).thenReturn(Mono.just(List.of(gate(147, "192.0.2.85", 0))));
+        when(settingsClient.autoOff(anyString(), anyInt())).thenReturn(Mono.just(1.0));
+        when(registryClient.getIntercoms()).thenReturn(Mono.just(List.of(station(150, true), station(146, true),
+            station(140, false))));
+        registry.refreshOnce().as(StepVerifier::create).verifyComplete();
+
+        assertThat(registry.currentIntercom()).contains(new IntercomDevice(146L, "Intercom"));
+
+        when(registryClient.getIntercoms()).thenReturn(Mono.error(new RegistryCallException("database-service answered 503")));
+        registry.refreshOnce().as(StepVerifier::create).verifyComplete();
+
+        assertThat(registry.currentIntercom()).contains(new IntercomDevice(146L, "Intercom"));
+        assertThat(registry.current()).isPresent();
     }
 
     @Test
@@ -48,7 +72,7 @@ class GateRegistryTest {
         registry.refreshOnce().as(StepVerifier::create).verifyComplete();
 
         assertThat(registry.current()).contains(
-            new GateRegistry.GateState(new GateDevice(147, "192.0.2.85", 0), 1.0, true, NOW));
+            new GateRegistry.GateState(new GateDevice(147, "Gate", "192.0.2.85", 0), 1.0, true, NOW));
         assertThat(registry.current().orElseThrow().safe()).isTrue();
     }
 

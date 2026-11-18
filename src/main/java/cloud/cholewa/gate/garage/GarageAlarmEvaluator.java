@@ -12,14 +12,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-//What one pass does about one garage gate (HAS-475) - pure, so every rule is tested on a clock:
-//- a gate not known never alarms and keeps its episodes as they are;
-//- a gate closed ends every open episode of it with one "closed";
-//- a gate open: COLD while it stands open coldOpenFor and the temperature outside (not stale) is below coldBelow;
-//  EMPTY_HOUSE while nobody is at home and both hold emptyFor; LONG while it stands open longAfter - never raised nor
-//  repeated while an alarm of that gate holds. An episode that holds is repeated every alarmEvery / warningEvery, at
-//  most 10 times; one whose condition no longer holds while the gate stays open ends without a word;
-//- an episode of an earlier opening (the gate closed and opened again between two passes) ends with one "closed"
+//What one pass does about one garage gate (HAS-475) - pure, so every rule is tested on a clock. A gate not known never
+//alarms and keeps its episodes as they are. A gate closed ends every open episode of it with one closed message. A gate
+//open is the cold alarm while it stands open for the cold time and the fresh temperature outside is below the bound, the
+//empty-house alarm while nobody is at home and both hold for the empty time, and the warning while it stands open for
+//long - the warning never raised nor repeated while an alarm of that gate holds. An episode that holds is repeated on
+//its interval, at most 10 times, and one whose condition no longer holds while the gate stays open ends without a word.
+//An episode of an earlier opening (the gate closed and opened again between two passes) ends with one closed message
 public final class GarageAlarmEvaluator {
 
     public static final String COLD = "COLD";
@@ -86,29 +85,33 @@ public final class GarageAlarmEvaluator {
             && !between(later(openSince, house.emptySince()), now, zone).minus(properties.emptyFor()).isNegative();
         final boolean longOpen = !open.minus(properties.longAfter()).isNegative();
 
-        alarm(actions, COLD, cold, of(current, COLD), openSince, now, zone, properties.alarmEvery());
-        alarm(actions, EMPTY_HOUSE, empty, of(current, EMPTY_HOUSE), openSince, now, zone, properties.alarmEvery());
+        final Moment moment = new Moment(openSince, now, zone);
+        alarm(actions, COLD, cold, of(current, COLD), moment, properties.alarmEvery());
+        alarm(actions, EMPTY_HOUSE, empty, of(current, EMPTY_HOUSE), moment, properties.alarmEvery());
         final Optional<GarageGateAlertEntity> warning = of(current, LONG);
         if (cold || empty) {
             //the warning waits while an alarm holds: kept, not repeated
             return actions;
         }
-        alarm(actions, LONG, longOpen, warning, openSince, now, zone, properties.warningEvery());
+        alarm(actions, LONG, longOpen, warning, moment, properties.warningEvery());
         return actions;
     }
 
+    //since when the gate is open, now, and the zone the two are times of
+    private record Moment(LocalDateTime openSince, LocalDateTime now, ZoneId zone) {
+    }
+
     private static void alarm(final List<Action> actions, final String kind, final boolean holds,
-                              final Optional<GarageGateAlertEntity> episode, final LocalDateTime openSince,
-                              final LocalDateTime now, final ZoneId zone, final Duration every) {
+                              final Optional<GarageGateAlertEntity> episode, final Moment moment, final Duration every) {
         if (holds && episode.isEmpty()) {
-            actions.add(new Raise(kind, openSince));
+            actions.add(new Raise(kind, moment.openSince()));
             return;
         }
         episode.ifPresent(held -> {
             if (!holds) {
                 actions.add(new EndSilently(held));
             } else if (held.reminders() < MAX_REMINDERS
-                && !between(held.lastMessageAt(), now, zone).minus(every).isNegative()) {
+                && !between(held.lastMessageAt(), moment.now(), moment.zone()).minus(every).isNegative()) {
                 actions.add(new Remind(held));
             }
         });

@@ -27,7 +27,10 @@ public enum GateError implements ErrorId {
     REGISTRY_UNAVAILABLE("Registry unavailable"),
 
     //the period of the events (HAS-450): from not before to, or longer than 31 days
-    INVALID_RANGE("Invalid range");
+    INVALID_RANGE("Invalid range"),
+
+    //no garage gate of that id (HAS-473): not in the registry, switched off, or the registry never read
+    NOT_FOUND_GATE("Gate not found");
 
     private final String description;
 }

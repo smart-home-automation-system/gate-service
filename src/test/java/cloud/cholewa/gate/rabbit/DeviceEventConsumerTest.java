@@ -1,5 +1,6 @@
 package cloud.cholewa.gate.rabbit;
 
+import cloud.cholewa.gate.garage.GarageEventRouter;
 import cloud.cholewa.gate.intercom.IntercomEventRouter;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
@@ -20,7 +21,13 @@ class DeviceEventConsumerTest {
     private static final String KEY = "hmd.sensor.gate.Call-state.state";
 
     private final IntercomEventRouter router = mock(IntercomEventRouter.class);
-    private final DeviceEventConsumer consumer = new DeviceEventConsumer(router);
+    private final GarageEventRouter garageRouter = mock(GarageEventRouter.class);
+
+    {
+        //the routers see every event, each dropping what is not its own
+        when(garageRouter.route(any(), any())).thenReturn(Mono.empty());
+    }
+    private final DeviceEventConsumer consumer = new DeviceEventConsumer(router, garageRouter);
 
     @Test
     void should_hand_the_event_to_the_router_by_its_routing_key() {

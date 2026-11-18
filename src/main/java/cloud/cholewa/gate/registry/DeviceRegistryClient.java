@@ -37,6 +37,16 @@ public class DeviceRegistryClient {
         return getDevices(DeviceKind.INTERCOM, "door stations");
     }
 
+    //the BLU Door/Window sensors the garage gates name (HAS-473) - read by kind, the gates pick theirs
+    public Mono<List<SmartDevice>> getOpeningSensors() {
+        return getDevices(DeviceKind.OPENING_SENSOR, "opening sensors");
+    }
+
+    //the Shelly devices that hear the BLU sensors and hold their state (HAS-473)
+    public Mono<List<SmartDevice>> getBthomeGateways() {
+        return getDevices(DeviceKind.BTHOME_GATEWAY, "BTHome gateways");
+    }
+
     private Mono<List<SmartDevice>> getDevices(final DeviceKind kind, final String what) {
         return databaseServiceWebClient
             .get()

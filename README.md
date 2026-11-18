@@ -48,6 +48,12 @@ opens the gate, their log and the household told.
   pushed by notification-service to every member and opening the gate page of the dashboard - and every opening of the
   gate as `gate opened` with where from and who, on the intercom channel of Discord; never by SMS. A notification never
   fails nor holds the opening of the gate.
+- **The garage gates** (HAS-473): a gate of the registry with `openingSensors` is a garage gate - the driveway gate
+  is the one without. The state of each is read from the Shelly BLU Door/Window sensor on it, through the BTHome
+  gateway that hears it (`Shelly.GetComponents` every 5 min and the `bthomesensor` status topics between): open,
+  closed, or not known when the sensor never reported or its gateway has been silent for 30 min
+  (`gate.garage.gateway-silent-after`) - a BLU sensor sends only when it changes. The last reading of each sensor is
+  stored and read back at a start as not known until its gateway confirms it.
 
 # API
 
@@ -57,6 +63,8 @@ Base path `/home/gate`, routed by the gateway since 0.12.0 (HAS-447) - by path, 
 |---|---|---|
 | `POST` | `/open?source=dashboard&member=<name>` | Opens the gate for a member of the household (checked against the profiles of database-service, any case). `204` once the Shelly took the command; `400 UNKNOWN_MEMBER`, `409 OPEN_TOO_SOON` (within 15 s of the last command), `502 DEVICE_FAILED` (it may have moved all the same), `503 GATE_UNAVAILABLE` (no gate, or a relay that does not switch itself off), `502 REGISTRY_UNAVAILABLE` (the profiles could not be read). No question asked - as the button of the indoor screen. |
 | `GET` | `/` | The gate (`gate`: id, reachable, safe, `autoOffSeconds`, `checkedAt`), the bridge (`bridge`: online, at), the last ring (`lastRing`: at, button) and the last opening (`lastOpening`: at, source, member). A part not known is left out. |
+| `GET` | `/garage` | The garage gates (HAS-473), by id: `id`, `name`, `state` (`open` / `closed` / `unknown`), `since` (when the gateway heard the reading that decides it), `confirmedAt` (when a gateway last stood for its sensors), `reachable` and `safe` of its Shelly. A field not known is left out; an empty list before the first read of the registry. |
+| `GET` | `/garage/{id}` | One garage gate; `404 NOT_FOUND_GATE` for an id that is no garage gate. |
 | `GET` | `/events?from=&to=` | The timeline of a period (the time of the house, ISO `2026-11-18T00:00:00`, `from` included, `to` not, at most 31 days), the newest first: each item `kind` and `at` with the fields of its kind - `ring` (`button`), `dismissed`, `unlock` (`door`, `unlockType`, `screen`), `command` (`source` screen / dashboard, `member`, `outcome` opened / failed / too soon / unavailable); a field not known is left out. `400 INVALID_RANGE`. No picture - the station gives none. |
 
 # Run locally

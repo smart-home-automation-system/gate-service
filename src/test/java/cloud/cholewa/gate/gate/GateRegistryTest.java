@@ -35,6 +35,13 @@ class GateRegistryTest {
             .shelly(ShellyBinding.builder().address(address).generation(1).channel(channel).build()).build();
     }
 
+    private static SmartDevice garage(final long id, final String name, final String address, final long sensor,
+                                      final boolean enabled) {
+        return SmartDevice.builder().id(id).name(name).kind(DeviceKind.GATE).enabled(enabled)
+            .shelly(ShellyBinding.builder().address(address).generation(1).channel(0).build())
+            .openingSensors(List.of(sensor)).build();
+    }
+
     @Test
     void should_know_nothing_before_the_first_read() {
         assertThat(registry.current()).isEmpty();
@@ -125,6 +132,30 @@ class GateRegistryTest {
         registry.refreshOnce().as(StepVerifier::create).verifyComplete();
 
         assertThat(registry.current()).isEmpty();
+    }
+
+    //HAS-473: a gate with sensors is a garage gate - kept apart with the auto_off of its relay, never the driveway gate,
+    //however low its id; a switched-off one is not kept
+    @Test
+    void should_keep_the_garage_gates_apart_from_the_driveway_gate() {
+        when(registryClient.getGates()).thenReturn(Mono.just(List.of(
+            garage(149, "Kris", "192.0.2.29", 70L, true),
+            gate(147, "192.0.2.85", 0),
+            garage(120, "Off", "192.0.2.30", 71L, false),
+            garage(140, "Kate", "192.0.2.78", 72L, true),
+            garage(148, "Kate", "192.0.2.79", 69L, true))));
+        when(settingsClient.autoOff(anyString(), anyInt())).thenReturn(Mono.just(1.0));
+        when(settingsClient.autoOff("192.0.2.29", 0)).thenReturn(Mono.error(new IllegalStateException("timeout")));
+
+        registry.refreshOnce().as(StepVerifier::create).verifyComplete();
+
+        assertThat(registry.current()).map(state -> state.device().id()).contains(147L);
+        assertThat(registry.garages()).extracting(state -> state.gate().id()).containsExactly(140L, 148L, 149L);
+        assertThat(registry.garage(148)).map(GateRegistry.GarageGateState::gate)
+            .contains(new GarageGate(148, "Kate", "192.0.2.79", 0, List.of(69L)));
+        assertThat(registry.garage(148).orElseThrow().safe()).isTrue();
+        assertThat(registry.garage(149).orElseThrow().reachable()).isFalse();
+        assertThat(registry.garage(147)).isEmpty();
     }
 
     @Test

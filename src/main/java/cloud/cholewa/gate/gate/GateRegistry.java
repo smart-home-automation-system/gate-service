@@ -1,0 +1,111 @@
+package cloud.cholewa.gate.gate;
+
+import cloud.cholewa.commons.scheduling.ScheduledPass;
+import cloud.cholewa.gate.registry.DeviceRegistryClient;
+import cloud.cholewa.home.model.SmartDevice;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+
+//The Shelly of the gate (HAS-449): the device of the registry (the kind gate) and the auto_off of its relay, read at the
+//start and every five minutes. A failed read of the registry keeps the gate read before (a WARN); a failed read of the
+//device makes it unreachable and its auto_off not known - so not safe to command. Until the first read nothing is
+//known. The registry holds one gate; with more, the lowest id is driven and the rest named in a WARN
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class GateRegistry {
+
+    //below the delay of five minutes: a read of the registry and a read of the device, each bounded at 5 s
+    static final Duration LIMIT = Duration.ofMinutes(1);
+
+    private final DeviceRegistryClient deviceRegistryClient;
+    private final GateSettingsClient gateSettingsClient;
+    private final Clock clock;
+    private final AtomicReference<GateState> state = new AtomicReference<>();
+
+    //the gate and what the last read of it said: autoOff null and reachable false when the device did not answer
+    public record GateState(GateDevice device, Double autoOff, boolean reachable, LocalDateTime checkedAt) {
+
+        //a relay that switches itself off: only then is "turn on" a pulse and not a permanent signal to the drive
+        public boolean safe() {
+            return autoOff != null && autoOff > 0;
+        }
+    }
+
+    @Scheduled(initialDelayString = "PT0S", fixedDelayString = "PT5M")
+    Mono<Void> refresh() {
+        return ScheduledPass.bounded("gate registry refresh", LIMIT, this::refreshOnce);
+    }
+
+    Mono<Void> refreshOnce() {
+        return deviceRegistryClient.getGates()
+            .map(GateRegistry::chosen)
+            .flatMap(gate -> gate.map(this::check).orElseGet(() -> Mono.fromRunnable(this::forget)))
+            .onErrorResume(failure -> Mono.fromRunnable(() -> log.warn(
+                "The gate of the registry could not be read, the last one is kept: {}", failure.toString())));
+    }
+
+    //the gate of the registry with what its last read said, or nothing before the first read succeeded
+    public Optional<GateState> current() {
+        return Optional.ofNullable(state.get());
+    }
+
+    private Mono<Void> check(final GateDevice gate) {
+        return gateSettingsClient.autoOff(gate.address(), gate.channel())
+            .map(autoOff -> new GateState(gate, autoOff, true, LocalDateTime.now(clock)))
+            .onErrorResume(failure -> {
+                log.warn("The Shelly of the gate {} at {} did not answer the read of its settings: {}", gate.id(),
+                    gate.address(), failure.toString());
+                return Mono.just(new GateState(gate, null, false, LocalDateTime.now(clock)));
+            })
+            .doOnNext(this::replace)
+            .then();
+    }
+
+    private void replace(final GateState read) {
+        final GateState before = state.getAndSet(read);
+        if (!read.safe() && read.reachable()) {
+            //a pulse would be a permanent signal: the gate is not commanded (the alert comes with HAS-453)
+            log.error("The relay of the gate {} has auto_off {} - the gate is not commanded until it switches itself off",
+                read.device().id(), read.autoOff());
+        }
+        if (before == null || !before.device().equals(read.device())) {
+            log.info("The gate of the registry: {} at {} channel {}, auto_off {}", read.device().id(),
+                read.device().address(), read.device().channel(), read.autoOff());
+        }
+    }
+
+    private void forget() {
+        if (state.getAndSet(null) != null) {
+            log.warn("The registry knows no gate any more");
+        }
+    }
+
+    private static Optional<GateDevice> chosen(final List<SmartDevice> devices) {
+        final List<GateDevice> gates = devices.stream()
+            .filter(device -> !Boolean.FALSE.equals(device.getEnabled()))
+            .map(device -> GateDevice.of(device).or(() -> {
+                log.warn("Device {} of the registry is no gate the service understands", device.getId());
+                return Optional.empty();
+            }))
+            .flatMap(Optional::stream)
+            .sorted(Comparator.comparingLong(GateDevice::id))
+            .toList();
+        if (gates.size() > 1) {
+            log.warn("The registry knows {} gates, {} is driven: {}", gates.size(), gates.getFirst().id(),
+                gates.stream().map(GateDevice::id).toList());
+        }
+        return gates.stream().findFirst();
+    }
+}

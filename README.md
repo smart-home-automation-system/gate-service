@@ -36,14 +36,30 @@ opens the gate, their log and the household told.
   which door - stored in `intercom_event`; an unlock once, by its door and the time the station gives. The availability
   of the bridge is kept in memory. The motion of the camera and the events of every other device cause nothing.
 
-The command of the gate, the endpoints and the household messages come with HAS-449 onwards.
+- **The opening of the gate** (HAS-449): the Shelly 1 of the gate from the device registry (the kind `gate`, id 147,
+  channel 0), its relay pulsed by one "turn on" - its `auto_off` (1 s) ends the pulse; nothing is sent while the relay
+  does not switch itself off. An unlock of the indoor screen opens the gate at once (only an unlock younger than 60 s,
+  and the same unlock never twice); a second opening within 15 s is refused - the gate is step-by-step. Every opening is
+  logged in `gate_command`.
+
+The household messages come with HAS-452.
+
+# API
+
+Base path `/home/gate` (routed by the gateway with HAS-447).
+
+| Method | Path | What it does |
+|---|---|---|
+| `POST` | `/open?source=dashboard&member=<name>` | Opens the gate for a member of the household (checked against the profiles of database-service, any case). `204` once the Shelly took the command; `400 UNKNOWN_MEMBER`, `409 OPEN_TOO_SOON` (within 15 s of the last command), `502 DEVICE_FAILED` (it may have moved all the same), `503 GATE_UNAVAILABLE` (no gate, or a relay that does not switch itself off), `502 REGISTRY_UNAVAILABLE` (the profiles could not be read). No question asked - as the button of the indoor screen. |
+| `GET` | `/` | The gate (`gate`: id, reachable, safe, `autoOffSeconds`, `checkedAt`), the bridge (`bridge`: online, at), the last ring (`lastRing`: at, button) and the last opening (`lastOpening`: at, source, member). A part not known is left out. |
 
 # Run locally
 
-- Build: `mvn verify` (JDK 21) - **needs a running Docker**: the repository test runs on PostgreSQL in Testcontainers.
+- Build: `mvn verify` (JDK 21) - **needs a running Docker**: the repository tests run on PostgreSQL in Testcontainers.
 - Ports: local profile `6016` (management `8016`); in the cluster `6200` / `8200`.
 - Own database `home-automation-gate`, pool 2: `database-host`, `database-port`, `database-name`, `database-user`,
   `database-password` and `flyway-url`; `database-password` is mandatory (`cholewa.required-properties`), the rest
   falls back to `localhost` / dummy values that fail on Flyway.
 - The broker: `rabbitmq-password` (user `device`, mandatory); the local profile consumes `device.dev.gate` on
-  `localhost`. **A local run with the real values is the production database.**
+  `localhost`. database-service: `internal.service.database` (`localhost:6005` locally). **A local run with the real
+  values is the production database - and opens the real gate.**

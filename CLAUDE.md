@@ -39,6 +39,22 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   heard - after a stop of the service, as late as the queue held them (10 min TTL). A call state the bridge publishes only
   with its polling of ISAPI on (`ring`, `onCall`, `error` - off in the manifest) is a WARN, never a row.
   The availability of the bridge (`<entity>.availability`) is `BridgeAvailability`, in memory.
+- **The opening of the gate** (HAS-449, `gate/`): `GateRegistry` reads the gate of the registry (`?kind=gate&enabled=true`,
+  database-service >= 0.26.0) at the start and every 5 min, and the `auto_off` of its relay from the device
+  (`GateSettingsClient`, `GET /settings/relay/<channel>` - shelly-client has no read of Gen1 settings); a gate is
+  **safe** only with `auto_off` above 0 - otherwise "turn on" would be a permanent signal to the drive (an ERROR, the
+  alert comes with HAS-453). `GateOpener` sends one `relay(address, channel, true)` of `ShellyGen1Client`, never retried
+  (no answer: it may have moved); **the slot is taken before the command** - an opening within
+  `gate.open.ignore-repeat-for` (PT15S) of the last command sent is `OPEN_TOO_SOON`, so two requests at once send one
+  pulse. Every opening, refused ones included, is a row of `gate_command` (V3); a failed write never fails the opening.
+- **The screen** (`ScreenOpening`): the router hands every unlock to it while the event is written - **the gate does
+  not wait for the database**. `HOUSEHOLDER` from a number of `gate.screens` (`10010110001`, the readable form of
+  `control_source`) opens the gate, while younger than `gate.screen.max-age` (PT1M - an unlock that waited in the queue
+  through a restart opens nothing) and newer than the last unlock that opened it (the bridge publishing it again). A
+  card, a code or another source is stored and opens nothing.
+- **The API**: `POST /open?source=dashboard&member=` (the member checked against the profiles, any case, stored as the
+  registry spells it) and `GET /`; the codes of `GateError` are wire contract for the dashboard (`GateErrorTest`).
+  No question before an opening (owner, 2026-11-16). The first real opening is checked on the gate with the owner.
 - **The write is bounded** (30 s) and tried twice more with a backoff, never for a refusal of the schema; a body that
   is not what its topic carries is a WARN and the message is acknowledged.
 - **No picture of the station** (owner, 2026-11-17, HAS-444): the station gives no snapshot over ISAPI or the SDK,

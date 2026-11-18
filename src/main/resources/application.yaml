@@ -63,6 +63,21 @@ intercom:
   device: gate
   bridge-zone: UTC
 
+# the opening of the gate (HAS-449): the indoor screens whose unlock opens it (the number of an unlock of the station), the
+# time a second opening is refused (the gate is step-by-step) and the age above which an unlock of a screen opens nothing
+gate:
+  screens:
+    - "10010110001"
+  open:
+    ignore-repeat-for: 15s
+  screen:
+    max-age: 60s
+
+internal:
+  service:
+    # the Shelly of the gate (the kind gate of the device registry) and the household profiles
+    database: http://database-service:6200
+
 cholewa:
   # refuses the start before the first bean when one of these has no value (cholewa-commons >= 1.9.0)
   required-properties:
@@ -118,6 +133,10 @@ rabbitmq:
   queue:
     name: device.dev.gate
 
+internal:
+  service:
+    database: http://localhost:6005
+
 server:
   port: 6016
 management:
@@ -150,6 +169,11 @@ spring:
 rabbitmq:
   queue:
     name: device.test.gate
+
+# database-service at an address nothing listens on: a context test never reads the registry of the house
+internal:
+  service:
+    database: http://localhost:1
 
 # the pool opens nothing eagerly, and Flyway is off: a context test never reaches a database
 database:

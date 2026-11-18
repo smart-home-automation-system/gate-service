@@ -2,6 +2,7 @@ package cloud.cholewa.gate.intercom;
 
 import cloud.cholewa.gate.config.IntercomProperties;
 import cloud.cholewa.gate.database.IntercomEventEntity;
+import cloud.cholewa.gate.gate.ScreenOpening;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,8 +28,8 @@ import java.util.regex.Pattern;
 //- Call-state "ringing" is a ring, "dismissed" the end of a call (not answered, rejected or hung up alike), "idle"
 //  nothing - the bridge says it after every end and 60 s after every ring;
 //- the attributes of Door-<n>-relay are an unlock of the door n: one pulse of the relay (ON, then OFF), stored once
-//  (the owner, 2026-11-17: every unlock is an opening of the gate); the relay states and Door-unlocked say the same
-//  again and are not read;
+//  and handed to ScreenOpening, which opens the gate for an unlock of an indoor screen (the owner, 2026-11-17: every
+//  unlock is an opening of the gate, HAS-449); the relay states and Door-unlocked say the same again and are not read;
 //- <entity>.availability is the availability of the bridge;
 //- the motion triggers, the image, the commands and the rest of the entities cause nothing.
 @Slf4j
@@ -49,6 +50,7 @@ public class IntercomEventRouter {
     private static final DateTimeFormatter LAST_UNLOCKED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final IntercomEventService service;
+    private final ScreenOpening screenOpening;
     private final BridgeAvailability availability;
     private final IntercomProperties properties;
     private final JsonMapper jsonMapper;
@@ -111,8 +113,11 @@ public class IntercomEventRouter {
     private Mono<Void> unlock(final int door, final String payload, final LocalDateTime now) {
         return read(payload, UnlockAttributes.class, "Door-" + door + "-relay attributes")
             .flatMap(attributes -> occurredAt(attributes.lastUnlocked())
-                .map(occurredAt -> service.store(IntercomEventEntity.unlock(occurredAt, now, attributes.unlockType(),
-                    attributes.controlSource(), attributes.number(), door)))
+                //the gate opens at once (HAS-449), whatever the write of the event comes to
+                .map(occurredAt -> Mono.when(
+                    service.store(IntercomEventEntity.unlock(occurredAt, now, attributes.unlockType(),
+                        attributes.controlSource(), attributes.number(), door)),
+                    screenOpening.onUnlock(attributes.unlockType(), attributes.number(), occurredAt)))
                 .orElseGet(() -> Mono.fromRunnable(() -> log.warn(
                     "An unlock of the door {} without a time the service can read: {}", door, payload))));
     }

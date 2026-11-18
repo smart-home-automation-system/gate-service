@@ -2,6 +2,7 @@ package cloud.cholewa.gate.intercom;
 
 import cloud.cholewa.gate.config.IntercomProperties;
 import cloud.cholewa.gate.database.IntercomEventEntity;
+import cloud.cholewa.gate.gate.ScreenOpening;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,12 +39,14 @@ class IntercomEventRouterTest {
 
     private final IntercomEventService service = mock(IntercomEventService.class);
     private final BridgeAvailability availability = new BridgeAvailability();
-    private final IntercomEventRouter router = new IntercomEventRouter(service, availability,
+    private final ScreenOpening screenOpening = mock(ScreenOpening.class);
+    private final IntercomEventRouter router = new IntercomEventRouter(service, screenOpening, availability,
         new IntercomProperties("gate", ZoneId.of("UTC")), JsonMapper.builder().build(), CLOCK);
 
     @BeforeEach
     void storeEverything() {
         when(service.store(any())).thenReturn(Mono.empty());
+        when(screenOpening.onUnlock(any(), any(), any())).thenReturn(Mono.empty());
     }
 
     @Test
@@ -89,6 +92,26 @@ class IntercomEventRouterTest {
 
         assertThat(stored()).isEqualTo(IntercomEventEntity.unlock(LocalDateTime.of(2026, 11, 17, 16, 13, 37), NOW,
             "HOUSEHOLDER", "494848494849494848484900", "10010110001", 1));
+    }
+
+    //HAS-449: every unlock is handed to ScreenOpening, which decides whether it opens the gate
+    @Test
+    void should_hand_an_unlock_to_the_opening_of_the_screen() {
+        route("hmd.switch.gate.Door-1-relay.attributes", UNLOCK);
+
+        verify(screenOpening).onUnlock("HOUSEHOLDER", "10010110001", LocalDateTime.of(2026, 11, 17, 16, 13, 37));
+    }
+
+    //the gate opens whatever the write of the event comes to
+    @Test
+    void should_hand_an_unlock_to_the_opening_of_the_screen_when_its_write_fails() {
+        when(service.store(any())).thenReturn(Mono.error(new IllegalStateException("database down")));
+
+        router.route("hmd.switch.gate.Door-1-relay.attributes", UNLOCK.getBytes(StandardCharsets.UTF_8))
+            .as(StepVerifier::create)
+            .verifyError(IllegalStateException.class);
+
+        verify(screenOpening).onUnlock("HOUSEHOLDER", "10010110001", LocalDateTime.of(2026, 11, 17, 16, 13, 37));
     }
 
     //one unlock is one pulse: the relay states and Door-unlocked say it again, the motion triggers nothing at all

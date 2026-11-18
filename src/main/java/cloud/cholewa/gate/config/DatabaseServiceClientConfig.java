@@ -39,6 +39,35 @@ public class DatabaseServiceClientConfig {
         return client(webClientBuilder, databaseServiceConnectionProvider).baseUrl(services.database().toString()).build();
     }
 
+    //weather-service and presence-service (HAS-475): the temperature outside and who is at home - a pool each
+    @Bean(destroyMethod = "dispose")
+    ConnectionProvider weatherServiceConnectionProvider() {
+        return connectionProvider("weather-service");
+    }
+
+    @Bean
+    WebClient weatherServiceWebClient(
+        final WebClient.Builder webClientBuilder,
+        final ConnectionProvider weatherServiceConnectionProvider,
+        final InternalServicesProperties services
+    ) {
+        return client(webClientBuilder, weatherServiceConnectionProvider).baseUrl(services.weather().toString()).build();
+    }
+
+    @Bean(destroyMethod = "dispose")
+    ConnectionProvider presenceServiceConnectionProvider() {
+        return connectionProvider("presence-service");
+    }
+
+    @Bean
+    WebClient presenceServiceWebClient(
+        final WebClient.Builder webClientBuilder,
+        final ConnectionProvider presenceServiceConnectionProvider,
+        final InternalServicesProperties services
+    ) {
+        return client(webClientBuilder, presenceServiceConnectionProvider).baseUrl(services.presence().toString()).build();
+    }
+
     //the settings of the Shelly of the gate, read at its address of the registry - its own pool
     @Bean(destroyMethod = "dispose")
     ConnectionProvider gateShellyConnectionProvider() {

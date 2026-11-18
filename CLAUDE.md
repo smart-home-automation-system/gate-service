@@ -87,6 +87,19 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   **`garage_sensor_reading` (V4)** - per sensor, not per gate as the task planned: the last reading, read back at the
   start as not confirmed (`GarageReadingLoader`, the rule of HAS-419/420), an older reading never replaces a newer
   one (the upsert). `GET /garage`, `/garage/{id}` (`NOT_FOUND_GATE`) - memory only, no query.
+- **The alarms of a garage gate left open** (HAS-475, `garage/GarageAlarms`, replacing the Shelly cloud scene GARAGE
+  NOTIFICATION - its midnight check is not moved, owner 2026-11-18): every minute (bounded at 50 s) the open episodes
+  of `garage_gate_alert` (V5, one open per gate and kind - `garage_gate_alert_open_uq`), the temperature outside
+  (`WeatherClient`, `GET /home/weather/current` of weather-service over k8s DNS - a stale, missing or failed reading
+  is no cold) and who is at home (`PresenceClient` / `HouseOccupancy` - **the fifth copy** of the presence client,
+  after light, appliance, water and aircon - kept by the owner's choice, 2026-11-18; unknown is never empty), then `GarageAlarmEvaluator` decides per gate -
+  pure, tested on a clock: cold (open `cold-open-for` 15 min, below `cold-below` 15 C), empty house (open while empty
+  for `empty-for` 5 min, from the later of the opening and the last to go), long (open `long-after` 30 min, never while
+  an alarm holds); a repeat every `alarm-every` 30 min / `warning-every` 1 h, at most 10 (the bound of `reminder` of
+  the SDK, owner); a condition gone while the gate stays open ends its episode without a word; closed - one `garage
+  gate closed` for every open episode; a gate not known does nothing. **An episode is written only once its message
+  was told** (`HouseholdNotifier.garageGate` answers whether the broker confirmed it), so a broker away repeats it the
+  next pass. Durations in minutes with bounds, pinned by a test; two times of the house compared in its zone.
 - **The write is bounded** (30 s) and tried twice more with a backoff, never for a refusal of the schema; a body that
   is not what its topic carries is a WARN and the message is acknowledged.
 - **No picture of the station** (owner, 2026-11-17, HAS-444): the station gives no snapshot over ISAPI or the SDK,

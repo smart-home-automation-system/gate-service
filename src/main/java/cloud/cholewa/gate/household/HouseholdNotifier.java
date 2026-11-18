@@ -2,6 +2,7 @@ package cloud.cholewa.gate.household;
 
 import cloud.cholewa.commons.notification.NotificationPublisher;
 import cloud.cholewa.gate.config.DoorbellProperties;
+import cloud.cholewa.gate.gate.GarageGate;
 import cloud.cholewa.gate.gate.GateDevice;
 import cloud.cholewa.gate.gate.GateRegistry;
 import cloud.cholewa.gate.gate.IntercomDevice;
@@ -73,6 +74,23 @@ public class HouseholdNotifier {
             .source(source)
             .member(member)
             .build(), "gate opened").then());
+    }
+
+    //A garage gate left open (HAS-475): an alarm, the warning or its repeat, or the gate closed after it - true once the
+    //broker confirmed it, false when it could not be told (a WARN), never an error: the alarms mark an episode told only
+    //by it, and try again the next pass
+    public Mono<Boolean> garageGate(final HouseholdEvent event, final GarageGate gate, final LocalDateTime openSince,
+                                    final int reminder, final Double temperature, final LocalDateTime at) {
+        return Mono.defer(() -> publish(HouseholdNotification.builder()
+            .event(event)
+            .subject(gate.name())
+            .deviceId(gate.id())
+            .occurredAt(at)
+            .reminder(reminder)
+            .openSince(openSince)
+            .temperature(temperature)
+            .acknowledgePath(GATE_PAGE)
+            .build(), event.getValue()));
     }
 
     private static HouseholdNotification ring(final IntercomDevice station, final LocalDateTime at) {

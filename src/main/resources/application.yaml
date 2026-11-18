@@ -81,6 +81,16 @@ gate:
   # confirming it before the gate is not known - a BLU sensor sends only when it changes
   garage:
     gateway-silent-after: 30m
+    # the alarms of a garage gate left open (HAS-475, owner 2026-11-18): cold - open open-for and the temperature
+    # outside below below; empty house - open while nobody is at home for empty-for; long - open for long-after; a
+    # repeat every alarm-every / warning-every, at most 10 (the reminder of the payload)
+    alarm:
+      cold-open-for: 15m
+      cold-below: 15.0
+      empty-for: 5m
+      long-after: 30m
+      alarm-every: 30m
+      warning-every: 60m
 
 # the household told of a ring and an opening (HAS-452): a second connection, to /notification - the exchange lives on
 # another virtual host than the device events (NotificationRabbitConfig). cholewa.notification.enabled of
@@ -97,6 +107,9 @@ internal:
   service:
     # the Shelly of the gate (the kind gate of the device registry) and the household profiles
     database: http://database-service:6200
+    # the temperature outside and who is at home - the alarms of the garage gates (HAS-475)
+    weather: http://weather-service:6200
+    presence: http://presence-service:6200
 
 cholewa:
   # refuses the start before the first bean when one of these has no value (cholewa-commons >= 1.9.0)
@@ -161,6 +174,8 @@ notification:
 internal:
   service:
     database: http://localhost:6005
+    weather: http://localhost:6010
+    presence: http://localhost:6009
 
 server:
   port: 6016
@@ -204,6 +219,8 @@ notification:
 internal:
   service:
     database: http://localhost:1
+    weather: http://localhost:1
+    presence: http://localhost:1
 
 # the pool opens nothing eagerly, and Flyway is off: a context test never reaches a database
 database:

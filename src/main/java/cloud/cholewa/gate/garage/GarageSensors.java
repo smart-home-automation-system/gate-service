@@ -35,17 +35,16 @@ import java.util.stream.Collectors;
 
 //The sensors of the garage gates (HAS-473): Shelly BLU Door/Window sensors adopted by BTHome gateways, each a device of
 //the kind opening sensor in the registry, named in the openingSensors of its garage gate. The copy of WindowSensors of
-//blinds-service (HAS-290, HAS-420) - the third with heating-service, kept by the rule of three copies:
-//- which bthomesensor component of which gateway is the window object (0x2D) of which sensor is read from the gateways
-//  themselves - Shelly.GetComponents, every five minutes - with the state each one holds;
-//- between two reads the state comes from the status topic of the component (GarageEventRouter), about once a change;
-//- a sensor sends only when it changes (no beacon), so its own silence proves nothing: a state stands while its gateway
-//  confirms it, by a read or a publish, within gate.garage.gateway-silent-after. A sensor that never reported, or whose
-//  gateway went silent, is not known - a failing sensor never passes for a closed gate;
-//- a gate is judged by its sensors: open when one reports open, not known when one is not known, closed when every one
-//  is closed; since when - the time its gateway heard the reading that decides it;
-//- the last reading of every sensor is stored (GarageSensorStore) and read back at the start as not confirmed: the
-//  history a gateway value is compared with, never a state the gate is told by
+//blinds-service (HAS-290, HAS-420), the third with heating-service, kept by the rule of three copies.
+//Which bthomesensor component of which gateway is the window object of which sensor is read from the gateways
+//themselves, every five minutes, with the state each one holds. Between two reads the state comes from the status
+//topic of the component (GarageEventRouter), about once a change. A sensor sends only when it changes (no beacon), so
+//its own silence proves nothing: a state stands while its gateway confirms it, by a read or a publish, within
+//gate.garage.gateway-silent-after. A sensor that never reported, or whose gateway went silent, is not known - a failing
+//sensor never passes for a closed gate. A gate is judged by its sensors: open when one reports open, not known when one
+//is not known, closed when every one is closed, since the time its gateway heard the reading that decides it. The last
+//reading of every sensor is stored (GarageSensorStore) and read back at the start as not confirmed: the history a
+//gateway value is compared with, never a state the gate is told by
 @Slf4j
 @Component
 public class GarageSensors {

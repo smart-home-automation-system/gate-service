@@ -119,7 +119,7 @@ public class GateRegistry {
                 if (!before.stream().map(GarageGateState::gate).toList()
                     .equals(read.stream().map(GarageGateState::gate).toList())) {
                     log.info("The garage gates of the registry: {}", read.stream()
-                        .map(state -> state.gate().id() + " " + state.gate().name() + " sensors " + state.gate().sensors())
+                        .map(garage -> garage.gate().id() + " " + garage.gate().name() + " sensors " + garage.gate().sensors())
                         .toList());
                 }
             })
@@ -148,7 +148,7 @@ public class GateRegistry {
     }
 
     public Optional<GarageGateState> garage(final long id) {
-        return garages.get().stream().filter(state -> state.gate().id() == id).findFirst();
+        return garages.get().stream().filter(garage -> garage.gate().id() == id).findFirst();
     }
 
     //the gate of the registry with what its last read said, or nothing before the first read succeeded

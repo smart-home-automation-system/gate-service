@@ -23,11 +23,10 @@ import java.util.concurrent.atomic.AtomicReference;
 //Tells the household (HAS-452) - the household category of the notification exchange, worded in Polish by
 //notification-service >= 0.12.0 on its intercom channel: a ring at the gate (pushed to every member) and an opening of the
 //gate. Neither ever fails nor stalls what it reports on: an error is a WARN, a publish is cut off after PUBLISH_TIMEOUT.
-//- doorbell ringing: once per call - no second one within gate.doorbell.ignore-repeat-for of the last one told; the door
-//  station of the registry is its subject, and before the first read of the registry nothing is told (a WARN); a ring
-//  that could not be told gives the window back, so the next press of the same call is told;
-//  acknowledgePath the gate page of the dashboard (HAS-454);
-//- gate opened: after a pulse the Shelly took, with where from and, from the dashboard, who.
+//A ring is told once per call - no second one within gate.doorbell.ignore-repeat-for of the last one told. The door
+//station of the registry is its subject, and before the first read of the registry nothing is told (a WARN). A ring
+//that could not be told gives the window back, so the next press of the same call is told. It opens the gate page of
+//the dashboard (HAS-454). An opening is told after a pulse the Shelly took, with where from and, from the dashboard, who.
 @Slf4j
 @Component
 @RequiredArgsConstructor

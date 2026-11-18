@@ -1,6 +1,7 @@
 package cloud.cholewa.gate;
 
 import cloud.cholewa.commons.database.DatabaseProperties;
+import cloud.cholewa.gate.config.GateProperties;
 import cloud.cholewa.gate.config.IntercomProperties;
 import cloud.cholewa.shelly.http.ShellyGen1Client;
 import cloud.cholewa.shelly.http.ShellyRpcClient;
@@ -12,6 +13,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Duration;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +28,8 @@ class GateServiceApplicationTest {
     private ApplicationContext applicationContext;
     @Autowired
     private IntercomProperties intercomProperties;
+    @Autowired
+    private GateProperties gateProperties;
 
     @Test
     void contextLoads() {
@@ -64,6 +68,15 @@ class GateServiceApplicationTest {
         assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[1].variable"))
             .isEqualTo("rabbitmq-password");
         assertThat(applicationContext.getEnvironment().getProperty("cholewa.required-properties[2].property")).isNull();
+    }
+
+    //the opening of the gate (HAS-449): the screen of the house, the repeat of 15 s and the age of 60 s - both durations
+    //bound in seconds, not milliseconds
+    @Test
+    void should_bind_the_opening_of_the_gate() {
+        assertThat(gateProperties.screens()).containsExactly("10010110001");
+        assertThat(gateProperties.open().ignoreRepeatFor()).isEqualTo(Duration.ofSeconds(15));
+        assertThat(gateProperties.screen().maxAge()).isEqualTo(Duration.ofSeconds(60));
     }
 
     //the events of the door station (HAS-448): the queue of every device, the user device of /device, manual acks

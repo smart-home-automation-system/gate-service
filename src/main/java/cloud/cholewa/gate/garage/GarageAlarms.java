@@ -105,20 +105,20 @@ public class GarageAlarms {
     private Mono<Void> act(final GarageGate gate, final Action action, final Optional<Temperature> temperature,
                            final LocalDateTime now) {
         return switch (action) {
-            case Raise raise -> tell(gate, raise.kind(), raise.openSince(), 0, temperature, now)
+            case Raise(String kind, LocalDateTime openSince) -> tell(gate, kind, openSince, 0, temperature, now)
                 .filter(Boolean::booleanValue)
-                .doOnNext(told -> log.info("Garage gate {} ({}): {} since {}", gate.id(), gate.name(), raise.kind(),
-                    raise.openSince()))
-                .flatMap(told -> write(GarageGateAlertEntity.raised(gate.id(), raise.kind(), raise.openSince(), now)));
-            case Remind remind -> tell(gate, remind.episode().kind(), remind.episode().openSince(),
-                remind.episode().reminders() + 1, temperature, now)
+                .doOnNext(told -> log.info("Garage gate {} ({}): {} since {}", gate.id(), gate.name(), kind, openSince))
+                .flatMap(told -> write(GarageGateAlertEntity.raised(gate.id(), kind, openSince, now)));
+            case Remind(GarageGateAlertEntity episode) -> tell(gate, episode.kind(), episode.openSince(),
+                episode.reminders() + 1, temperature, now)
                 .filter(Boolean::booleanValue)
-                .flatMap(told -> write(remind.episode().reminded(now)));
-            case EndSilently end -> write(end.episode().closed(now));
-            case Closed closed -> householdNotifier.garageGate(HouseholdEvent.GARAGE_GATE_CLOSED, gate,
-                    closed.episodes().stream().map(GarageGateAlertEntity::openSince).min(Comparator.naturalOrder())
-                        .orElse(null), 0, null, now)
-                .thenMany(Flux.fromIterable(closed.episodes()))
+                .flatMap(told -> write(episode.reminded(now)));
+            case EndSilently(GarageGateAlertEntity episode) -> write(episode.closed(now));
+            case Closed(List<GarageGateAlertEntity> episodes) -> householdNotifier.garageGate(
+                    HouseholdEvent.GARAGE_GATE_CLOSED, gate,
+                    episodes.stream().map(GarageGateAlertEntity::openSince).min(Comparator.naturalOrder()).orElse(null),
+                    0, null, now)
+                .thenMany(Flux.fromIterable(episodes))
                 .concatMap(episode -> write(episode.closed(now)))
                 .then();
         };

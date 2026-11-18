@@ -41,17 +41,20 @@ opens the gate, their log and the household told.
   does not switch itself off. An unlock of the indoor screen opens the gate at once (only an unlock younger than 60 s,
   and the same unlock never twice); a second opening within 15 s is refused - the gate is step-by-step. Every opening is
   logged in `gate_command`.
+- **The log** (HAS-450): the rings, dismissed calls and unlocks of the station and the commands of the gate as one
+  timeline, the newest first; both tables are kept 90 days (`gate.retention`), deleted every night at 03:40.
 
 The household messages come with HAS-452.
 
 # API
 
-Base path `/home/gate` (routed by the gateway with HAS-447).
+Base path `/home/gate`, routed by the gateway since 0.12.0 (HAS-447) - by path, every method.
 
 | Method | Path | What it does |
 |---|---|---|
 | `POST` | `/open?source=dashboard&member=<name>` | Opens the gate for a member of the household (checked against the profiles of database-service, any case). `204` once the Shelly took the command; `400 UNKNOWN_MEMBER`, `409 OPEN_TOO_SOON` (within 15 s of the last command), `502 DEVICE_FAILED` (it may have moved all the same), `503 GATE_UNAVAILABLE` (no gate, or a relay that does not switch itself off), `502 REGISTRY_UNAVAILABLE` (the profiles could not be read). No question asked - as the button of the indoor screen. |
 | `GET` | `/` | The gate (`gate`: id, reachable, safe, `autoOffSeconds`, `checkedAt`), the bridge (`bridge`: online, at), the last ring (`lastRing`: at, button) and the last opening (`lastOpening`: at, source, member). A part not known is left out. |
+| `GET` | `/events?from=&to=` | The timeline of a period (the time of the house, ISO `2026-11-18T00:00:00`, `from` included, `to` not, at most 31 days), the newest first: each item `kind` and `at` with the fields of its kind - `ring` (`button`), `dismissed`, `unlock` (`door`, `unlockType`, `screen`), `command` (`source` screen / dashboard, `member`, `outcome` opened / failed / too soon / unavailable); a field not known is left out. `400 INVALID_RANGE`. No picture - the station gives none. |
 
 # Run locally
 

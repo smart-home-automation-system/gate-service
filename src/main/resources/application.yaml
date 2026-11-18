@@ -77,6 +77,10 @@ gate:
   # a ring told to the household (HAS-452): once per call of the station - none again within this of the last told
   doorbell:
     ignore-repeat-for: 60s
+  # the garage gates (HAS-473): how long the state of a sensor on a garage gate stands without its BTHome gateway
+  # confirming it before the gate is not known - a BLU sensor sends only when it changes
+  garage:
+    gateway-silent-after: 30m
 
 # the household told of a ring and an opening (HAS-452): a second connection, to /notification - the exchange lives on
 # another virtual host than the device events (NotificationRabbitConfig). cholewa.notification.enabled of

@@ -3,7 +3,7 @@
 The driveway gate and the intercom of the house (epic HAS-442): the events of the Hikvision door station at the
 gate, the command of the Shelly that opens the gate, their log and the household told. The scaffold of HAS-446,
 from the scaffold of aircon-service (itself from energy-service and water-service): Spring Boot 4.1.2,
-cholewa-commons 1.14.0, smart-home-sdk 1.22.0, shelly-client 2.7.0 with its beans on; port 6016 / 8016 locally,
+cholewa-commons 1.14.0, smart-home-sdk 1.23.0 (HAS-473), shelly-client 2.7.0 with its beans on; port 6016 / 8016 locally,
 6200 / 8200 in the cluster, base path `/home/gate`; own database `home-automation-gate`, pool 2, `V1` an empty
 baseline; `database-password` mandatory; scheduling off under `test`; the Deployment `Recreate`, never scaled
 (state in memory will follow). Org-wide rules: `organization-repository/claude/organization.md`.
@@ -71,6 +71,22 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   `member`, the gate of the registry its subject (`GateDevice.name`). A publish is cut off after 30 s and every error is a
   WARN - nothing told ever fails or holds the opening (the dashboard waits for the confirm of the broker, ms, at most
   30 s); the ring is told while it is written (`Mono.when`).
+- **The garage gates** (HAS-473, `garage/`): a gate of the registry with `openingSensors` (database-service >= 0.27.0) is
+  a garage gate (`GarageGate`), the driveway gate is the lowest id of the gates without one - `GateRegistry` keeps them
+  apart in one read of `?kind=gate&enabled=true`, each garage gate with the `auto_off` of its relay
+  (`GarageGateState`). **The registry holds 148 Kate and 149 Kris**, registered disabled in HAS-471 and switched on
+  after the deploy of 0.6.0. **`GarageSensors` is the copy of `WindowSensors` of blinds-service** (HAS-290, HAS-420 -
+  the third with heating-service, kept by the rule of three copies): the sensors the garage gates name and the BTHome
+  gateways of the registry every 5 min (`GarageSensorsRefresh`, the first pass 20 s after the start - the gates are read
+  in a pass of their own), which `bthomesensor` component of which gateway is the window object (0x2D) of which sensor
+  read from `Shelly.GetComponents` (shelly-client `dynamicComponents`), between two reads the status topics of
+  `device.prod.gate` (`GarageEventRouter`, next to the router of the intercom in `DeviceEventConsumer` - each drops
+  what is not its own before reading a body). A BLU sensor has no beacon: a state holds while its gateway confirms
+  it, `gate.garage.gateway-silent-after` (PT30M, in minutes, 10 min - 24 h); a gate is open when one sensor is,
+  not known when one is not known, closed when all are; `since` the time its gateway heard the deciding reading.
+  **`garage_sensor_reading` (V4)** - per sensor, not per gate as the task planned: the last reading, read back at the
+  start as not confirmed (`GarageReadingLoader`, the rule of HAS-419/420), an older reading never replaces a newer
+  one (the upsert). `GET /garage`, `/garage/{id}` (`NOT_FOUND_GATE`) - memory only, no query.
 - **The write is bounded** (30 s) and tried twice more with a backoff, never for a refusal of the schema; a body that
   is not what its topic carries is a WARN and the message is acknowledged.
 - **No picture of the station** (owner, 2026-11-17, HAS-444): the station gives no snapshot over ISAPI or the SDK,

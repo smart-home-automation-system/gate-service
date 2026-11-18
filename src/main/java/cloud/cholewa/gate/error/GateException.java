@@ -44,6 +44,12 @@ public abstract class GateException extends RuntimeException {
         }
     }
 
+    public static final class GateNotFound extends GateException {
+        public GateNotFound(final long id) {
+            super(GateError.NOT_FOUND_GATE, "No garage gate of the id " + id);
+        }
+    }
+
     public static final class RegistryUnavailable extends GateException {
         public RegistryUnavailable() {
             super(GateError.REGISTRY_UNAVAILABLE, "The household profiles could not be read");

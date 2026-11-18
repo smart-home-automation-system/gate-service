@@ -63,6 +63,31 @@ class DeviceRegistryClientTest {
         assertThat(request.getUrl().queryParameter("enabled")).isEqualTo("true");
     }
 
+    //HAS-473: the opening sensors and the BTHome gateways, read by kind for the garage gates
+    @Test
+    void should_read_the_opening_sensors_and_the_bthome_gateways_by_kind() throws InterruptedException {
+        server.enqueue(json("""
+            [{"id":69,"name":"Garage gate Kate","room":"garage","kind":"opening sensor","enabled":true,
+              "vendor":"shelly","bthome":{"address":"8c:6f:b9:00:00:69"}}]
+            """));
+        server.enqueue(json("""
+            [{"id":79,"name":"Grid power","room":"garage","kind":"bthome gateway","enabled":true,"vendor":"shelly",
+              "shelly":{"address":"192.0.2.95","generation":2,"deviceId":"shellypro3em-0123456789ab"}}]
+            """));
+
+        client.getOpeningSensors().as(StepVerifier::create)
+            .assertNext(devices -> assertThat(devices).singleElement().satisfies(device ->
+                assertThat(device.getBthome().getAddress()).isEqualTo("8c:6f:b9:00:00:69")))
+            .verifyComplete();
+        client.getBthomeGateways().as(StepVerifier::create)
+            .assertNext(devices -> assertThat(devices).singleElement().satisfies(device ->
+                assertThat(device.getShelly().getDeviceId()).isEqualTo("shellypro3em-0123456789ab")))
+            .verifyComplete();
+
+        assertThat(server.takeRequest().getUrl().queryParameter("kind")).isEqualTo("opening sensor");
+        assertThat(server.takeRequest().getUrl().queryParameter("kind")).isEqualTo("bthome gateway");
+    }
+
     //HAS-452: the door station, the subject of a ring told to the household
     @Test
     void should_read_the_switched_on_door_stations() throws InterruptedException {

@@ -48,7 +48,8 @@ public class GateEventService {
         if (!from.isBefore(to)) {
             return Optional.of("from must be before to");
         }
-        if (Duration.between(from, to).compareTo(MAX_PERIOD) > 0) {
+        //the wall time of the house plus the days - no duration between two local times (S8700)
+        if (to.isAfter(from.plus(MAX_PERIOD))) {
             return Optional.of("The period may be at most " + MAX_PERIOD.toDays() + " days");
         }
         return Optional.empty();

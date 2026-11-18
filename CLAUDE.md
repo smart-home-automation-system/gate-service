@@ -12,7 +12,8 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
 
 - Talks to: the intercom events on `device.prod.gate` of `/device` (HAS-448, the contract in
   `deployment-tools/scripts/hikvision/devices.md`), the Shelly 1 of the gate over HTTP (HAS-449), the household
-  category of the notification exchange (HAS-452); routed by the gateway under `/gate` (HAS-447).
+  category of the notification exchange over a second connection to `/notification` (HAS-452, user `notification`,
+  `notification-rabbitmq-password`; `NotificationRabbitConfig` - one more copy of the config kept per service); routed by the gateway under `/gate` (HAS-447).
 - Uses libraries: cholewa-commons, smart-home-sdk, shelly-client.
 - Database: own database `home-automation-gate`, 2 of the 47 connections of the managed PostgreSQL.
 - Integrates with hardware: the Hikvision door station (through the bridge, never directly), the Shelly 1 Gen1 of
@@ -62,6 +63,14 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   older than `gate.retention` (90 days, in days, 31 - 3650, pinned by a test) are deleted, one table after the other,
   each with its own WARN; the bound read inside the chain, the pass bounded at 5 min. After 90 days without a ring
   `GET /` leaves `lastRing` out - no row is no knowledge.
+- **The household told** (HAS-452, `household/HouseholdNotifier`, read by notification-service >= 0.12.0): `doorbell
+  ringing` at every ring the router hears, once per call - none within `gate.doorbell.ignore-repeat-for` (60 s) of the
+  last one told, judged on instants; its subject the door station of the registry (`?kind=intercom`, read by
+  `GateRegistry` in the pass of the gate, on its own - a ring before the first read is a WARN and no message),
+  `acknowledgePath` `/gate` (the gate page of HAS-454). `gate opened` after a pulse the Shelly took, `source` and
+  `member`, the gate of the registry its subject (`GateDevice.name`). A publish is cut off after 30 s and every error is a
+  WARN - nothing told ever fails or holds the opening (the dashboard waits for the confirm of the broker, ms, at most
+  30 s); the ring is told while it is written (`Mono.when`).
 - **The write is bounded** (30 s) and tried twice more with a backoff, never for a refusal of the schema; a body that
   is not what its topic carries is a WARN and the message is acknowledged.
 - **No picture of the station** (owner, 2026-11-17, HAS-444): the station gives no snapshot over ISAPI or the SDK,

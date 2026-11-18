@@ -44,7 +44,10 @@ opens the gate, their log and the household told.
 - **The log** (HAS-450): the rings, dismissed calls and unlocks of the station and the commands of the gate as one
   timeline, the newest first; both tables are kept 90 days (`gate.retention`), deleted every night at 03:40.
 
-The household messages come with HAS-452.
+- **The household told** (HAS-452): a ring at the gate as `doorbell ringing` - once per call (none again within 60 s),
+  pushed by notification-service to every member and opening the gate page of the dashboard - and every opening of the
+  gate as `gate opened` with where from and who, on the intercom channel of Discord; never by SMS. A notification never
+  fails nor holds the opening of the gate.
 
 # API
 
@@ -64,5 +67,6 @@ Base path `/home/gate`, routed by the gateway since 0.12.0 (HAS-447) - by path, 
   `database-password` and `flyway-url`; `database-password` is mandatory (`cholewa.required-properties`), the rest
   falls back to `localhost` / dummy values that fail on Flyway.
 - The broker: `rabbitmq-password` (user `device`, mandatory); the local profile consumes `device.dev.gate` on
-  `localhost`. database-service: `internal.service.database` (`localhost:6005` locally). **A local run with the real
+  `localhost`. The household messages: `notification-rabbitmq-password` (user `notification`, mandatory), `env: dev`
+  locally - `notification.dev.household`. database-service: `internal.service.database` (`localhost:6005` locally). **A local run with the real
   values is the production database - and opens the real gate.**

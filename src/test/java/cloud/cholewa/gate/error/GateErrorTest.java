@@ -13,6 +13,6 @@ class GateErrorTest {
     @Test
     void should_keep_the_names_of_the_codes() {
         assertThat(Arrays.stream(GateError.values()).map(Enum::name)).containsExactly(
-            "UNKNOWN_MEMBER", "OPEN_TOO_SOON", "DEVICE_FAILED", "GATE_UNAVAILABLE", "REGISTRY_UNAVAILABLE");
+            "UNKNOWN_MEMBER", "OPEN_TOO_SOON", "DEVICE_FAILED", "GATE_UNAVAILABLE", "REGISTRY_UNAVAILABLE", "INVALID_RANGE");
     }
 }

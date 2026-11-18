@@ -110,4 +110,35 @@ class IntercomEventRepositoryTest {
             .as(StepVerifier::create)
             .verifyError(DataIntegrityViolationException.class);
     }
+
+    //HAS-450: from included, to not, the newest first
+    @Test
+    void should_read_the_events_of_a_period_newest_first() {
+        repository.save(IntercomEventEntity.ring(AT.minusSeconds(1), "10010100000"))
+            .then(repository.save(IntercomEventEntity.ring(AT, "10010100000")))
+            .then(repository.save(IntercomEventEntity.dismissed(AT.plusMinutes(1))))
+            .then(repository.save(IntercomEventEntity.unlock(AT.plusMinutes(2), AT.plusMinutes(2), "HOUSEHOLDER",
+                "494848494849494848484900", "10010110001", 1)))
+            .then(repository.save(IntercomEventEntity.ring(AT.plusMinutes(3), "10010100000")))
+            .thenMany(repository.findInPeriod(AT, AT.plusMinutes(3)))
+            .map(IntercomEventEntity::kind)
+            .collectList()
+            .as(StepVerifier::create)
+            .assertNext(kinds -> assertThat(kinds).containsExactly(
+                IntercomEventEntity.UNLOCK, IntercomEventEntity.DISMISSED, IntercomEventEntity.RING))
+            .verifyComplete();
+    }
+
+    //HAS-450: the retention deletes what is older than its bound, not the event at it
+    @Test
+    void should_delete_the_events_before_a_bound() {
+        repository.save(IntercomEventEntity.ring(AT.minusSeconds(1), "10010100000"))
+            .then(repository.save(IntercomEventEntity.dismissed(AT)))
+            .then(repository.deleteBefore(AT))
+            .as(StepVerifier::create).expectNext(1L).verifyComplete();
+
+        repository.findAll().map(IntercomEventEntity::kind).collectList().as(StepVerifier::create)
+            .assertNext(kinds -> assertThat(kinds).containsExactly(IntercomEventEntity.DISMISSED))
+            .verifyComplete();
+    }
 }

@@ -53,8 +53,15 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   through a restart opens nothing) and newer than the last unlock that opened it (the bridge publishing it again). A
   card, a code or another source is stored and opens nothing.
 - **The API**: `POST /open?source=dashboard&member=` (the member checked against the profiles, any case, stored as the
-  registry spells it) and `GET /`; the codes of `GateError` are wire contract for the dashboard (`GateErrorTest`).
+  registry spells it), `GET /` and `GET /events?from=&to=` (HAS-450, `GateEventService`: `intercom_event` and
+  `gate_command` read newest first and merged by `Flux.mergeComparing`, the commands first into a list so that the
+  read holds one connection of the pool of 2 at a time; at most 31 days,
+  `INVALID_RANGE`); the codes of `GateError` are wire contract for the dashboard (`GateErrorTest`).
   No question before an opening (owner, 2026-11-16). The first real opening is checked on the gate with the owner.
+- **The retention** (HAS-450, `GateRetention`): every night at 03:40 the rows of `intercom_event` and `gate_command`
+  older than `gate.retention` (90 days, in days, 31 - 3650, pinned by a test) are deleted, one table after the other,
+  each with its own WARN; the bound read inside the chain, the pass bounded at 5 min. After 90 days without a ring
+  `GET /` leaves `lastRing` out - no row is no knowledge.
 - **The write is bounded** (30 s) and tried twice more with a backoff, never for a refusal of the schema; a body that
   is not what its topic carries is a WARN and the message is acknowledged.
 - **No picture of the station** (owner, 2026-11-17, HAS-444): the station gives no snapshot over ISAPI or the SDK,

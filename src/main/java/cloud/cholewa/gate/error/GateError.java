@@ -24,7 +24,10 @@ public enum GateError implements ErrorId {
     GATE_UNAVAILABLE("Gate unavailable"),
 
     //the household profiles could not be read, so the member cannot be checked
-    REGISTRY_UNAVAILABLE("Registry unavailable");
+    REGISTRY_UNAVAILABLE("Registry unavailable"),
+
+    //the period of the events (HAS-450): from not before to, or longer than 31 days
+    INVALID_RANGE("Invalid range");
 
     private final String description;
 }

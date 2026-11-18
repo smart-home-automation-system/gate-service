@@ -2,6 +2,7 @@ package cloud.cholewa.gate.household;
 
 import cloud.cholewa.commons.notification.NotificationPublisher;
 import cloud.cholewa.gate.config.DoorbellProperties;
+import cloud.cholewa.gate.gate.GarageGate;
 import cloud.cholewa.gate.gate.GateDevice;
 import cloud.cholewa.gate.gate.GateRegistry;
 import cloud.cholewa.gate.gate.IntercomDevice;
@@ -136,6 +137,23 @@ class HouseholdNotifierTest {
                 .occurredAt(AT).reminder(0).source(GateOpenSource.DASHBOARD).member("Anna").build(),
             HouseholdNotification.builder().event(HouseholdEvent.GATE_OPENED).subject("Gate").deviceId(147L)
                 .occurredAt(AT).reminder(0).source(GateOpenSource.SCREEN).build());
+    }
+
+    //HAS-475: a garage gate left open - since when, the temperature of the cold alarm, the repeat; the gate page to open
+    @Test
+    void should_tell_a_garage_gate_left_open_and_say_whether_it_was_told() {
+        final GarageGate kate = new GarageGate(148, "Kate", "192.0.2.79", 0, List.of(69L));
+
+        notifier.garageGate(HouseholdEvent.GARAGE_GATE_OPEN_COLD, kate, AT.minusMinutes(15), 1, 7.5, AT)
+            .as(StepVerifier::create).expectNext(true).verifyComplete();
+
+        assertThat(published(1)).containsExactly(HouseholdNotification.builder()
+            .event(HouseholdEvent.GARAGE_GATE_OPEN_COLD).subject("Kate").deviceId(148L).occurredAt(AT).reminder(1)
+            .openSince(AT.minusMinutes(15)).temperature(7.5).acknowledgePath("/gate").build());
+
+        when(publisher.publishHousehold(any())).thenReturn(Mono.error(new IllegalStateException("nack")));
+        notifier.garageGate(HouseholdEvent.GARAGE_GATE_CLOSED, kate, AT.minusMinutes(15), 0, null, AT)
+            .as(StepVerifier::create).expectNext(false).verifyComplete();
     }
 
     //a notification never fails what it reports on

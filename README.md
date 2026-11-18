@@ -54,6 +54,14 @@ opens the gate, their log and the household told.
   closed, or not known when the sensor never reported or its gateway has been silent for 30 min
   (`gate.garage.gateway-silent-after`) - a BLU sensor sends only when it changes. The last reading of each sensor is
   stored and read back at a start as not known until its gateway confirms it.
+- **The alarms of a garage gate left open** (HAS-475, replacing the Shelly cloud scene GARAGE NOTIFICATION), judged
+  every minute: **cold** - open for 15 min while the temperature outside (weather-service, not stale) is below 15 C;
+  **empty house** - open while nobody is at home (presence-service; not known is never empty) for 5 min; both alarms,
+  repeated every 30 min; **long** - open for 30 min, a warning repeated every hour, not while an alarm holds. At most
+  10 repeats; when the gate closes the household is told once. Told as the `garage gate ...` household events -
+  notification-service >= 0.13.0 puts them on the intercom channel, pushes them and texts the first message of an
+  alarm to the members named for it. The episodes are kept in `garage_gate_alert`, so a restart neither repeats nor
+  loses one. The thresholds are `gate.garage.alarm.*`.
 
 # API
 
@@ -74,6 +82,7 @@ Base path `/home/gate`, routed by the gateway since 0.12.0 (HAS-447) - by path, 
 - Own database `home-automation-gate`, pool 2: `database-host`, `database-port`, `database-name`, `database-user`,
   `database-password` and `flyway-url`; `database-password` is mandatory (`cholewa.required-properties`), the rest
   falls back to `localhost` / dummy values that fail on Flyway.
+- The services of the cluster: `internal.service.database`, `.weather`, `.presence` (locally `6005`, `6010`, `6009`).
 - The broker: `rabbitmq-password` (user `device`, mandatory); the local profile consumes `device.dev.gate` on
   `localhost`. The household messages: `notification-rabbitmq-password` (user `notification`, mandatory), `env: dev`
   locally - `notification.dev.household`. database-service: `internal.service.database` (`localhost:6005` locally). **A local run with the real

@@ -171,7 +171,7 @@ public class GateRegistry {
     private void replace(final GateState read) {
         final GateState before = state.getAndSet(read);
         if (!read.safe() && read.reachable()) {
-            //a pulse would be a permanent signal: the gate is not commanded (the alert comes with HAS-453)
+            //a pulse would be a permanent signal: the gate is not commanded (and the availability monitor tells of it)
             log.error("The relay of the gate {} has auto_off {} - the gate is not commanded until it switches itself off",
                 read.device().id(), read.autoOff());
         }

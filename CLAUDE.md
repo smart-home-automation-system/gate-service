@@ -86,7 +86,10 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   not known when one is not known, closed when all are; `since` the time its gateway heard the deciding reading.
   **`garage_sensor_reading` (V4)** - per sensor, not per gate as the task planned: the last reading, read back at the
   start as not confirmed (`GarageReadingLoader`, the rule of HAS-419/420), an older reading never replaces a newer
-  one (the upsert). `GET /garage`, `/garage/{id}` (`NOT_FOUND_GATE`) - memory only, no query.
+  one (the upsert). `GET /garage`, `/garage/{id}` (`NOT_FOUND_GATE`) - memory only, no query. `GET /garage/alerts`
+  (HAS-454, `GarageAlertService`): the episodes of `garage_gate_alert` not closed, the newest first, `kind` in the words of
+  the dashboard (cold, empty house, long), `level` alarm or warning (long), the name of the gate from the registry - wire
+  contract for the gate page of the dashboard.
 - **The pulse of a garage gate and its history** (HAS-474, `garage/GaragePulser`, `GarageChangeLog`): `POST
   /garage/{id}/pulse?source=dashboard&member=` - the member checked by `HouseholdMembers` (shared with `POST /open` since),
   one `relay(address, channel, true)`, never retried, **no repeat window** (owner, 2026-11-18: a second press stops the

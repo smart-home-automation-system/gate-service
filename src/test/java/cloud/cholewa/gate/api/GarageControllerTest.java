@@ -1,8 +1,10 @@
 package cloud.cholewa.gate.api;
 
+import cloud.cholewa.gate.api.model.GarageAlertReply;
 import cloud.cholewa.gate.api.model.GarageGateReply;
 import cloud.cholewa.gate.config.ExceptionHandlerConfig;
 import cloud.cholewa.gate.error.GateException;
+import cloud.cholewa.gate.garage.GarageAlertService;
 import cloud.cholewa.gate.garage.GarageGateService;
 import cloud.cholewa.gate.garage.GarageState;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,32 @@ class GarageControllerTest {
 
     @MockitoBean
     private GarageGateService garageGateService;
+
+    @MockitoBean
+    private GarageAlertService garageAlertService;
+
+    //HAS-454: the open alarms and warnings - their fields are wire contract for the dashboard; a gate the registry no
+    //longer knows has no name
+    @Test
+    void should_answer_the_open_alarms_of_the_garage_gates() {
+        when(garageAlertService.open()).thenReturn(Flux.just(
+            new GarageAlertReply(148, "Kate", "cold", "alarm", SINCE, SINCE.plusMinutes(15), 2),
+            new GarageAlertReply(149, null, "long", "warning", SINCE, SINCE.plusMinutes(30), 0)));
+
+        webTestClient.get().uri("/garage/alerts").exchange()
+            .expectStatus().isOk()
+            .expectBody()
+            .jsonPath("$.length()").isEqualTo(2)
+            .jsonPath("$[0].gate").isEqualTo(148)
+            .jsonPath("$[0].name").isEqualTo("Kate")
+            .jsonPath("$[0].kind").isEqualTo("cold")
+            .jsonPath("$[0].level").isEqualTo("alarm")
+            .jsonPath("$[0].openSince").isEqualTo("2026-11-18T19:44:57")
+            .jsonPath("$[0].raisedAt").isEqualTo("2026-11-18T19:59:57")
+            .jsonPath("$[0].reminders").isEqualTo(2)
+            .jsonPath("$[1].name").doesNotExist()
+            .jsonPath("$[1].level").isEqualTo("warning");
+    }
 
     @Test
     void should_answer_every_garage_gate_and_leave_out_what_is_not_known() {

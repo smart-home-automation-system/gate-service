@@ -17,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 //HAS-473: the read of the garage gates - the fields are wire contract for the dashboard (HAS-454)
@@ -37,8 +38,8 @@ class GarageControllerTest {
     @Test
     void should_answer_every_garage_gate_and_leave_out_what_is_not_known() {
         when(garageGateService.all()).thenReturn(Flux.just(
-            new GarageGateReply(148, "Kate", GarageState.OPEN, SINCE, CONFIRMED, true, true),
-            new GarageGateReply(149, "Kris", GarageState.UNKNOWN, null, null, false, false)));
+            new GarageGateReply(148, "Kate", GarageState.OPEN, SINCE, CONFIRMED, true, true, false),
+            new GarageGateReply(149, "Kris", GarageState.UNKNOWN, null, null, false, false, null)));
 
         webTestClient.get().uri("/garage").exchange()
             .expectStatus().isOk()
@@ -51,15 +52,47 @@ class GarageControllerTest {
             .jsonPath("$[0].confirmedAt").isEqualTo("2026-11-18T19:50:00")
             .jsonPath("$[0].reachable").isEqualTo(true)
             .jsonPath("$[0].safe").isEqualTo(true)
+            .jsonPath("$[0].lastCommandConfirmed").isEqualTo(false)
+            .jsonPath("$[1].lastCommandConfirmed").doesNotExist()
             .jsonPath("$[1].state").isEqualTo("unknown")
             .jsonPath("$[1].since").doesNotExist()
             .jsonPath("$[1].confirmedAt").doesNotExist();
     }
 
+    //HAS-474: one pulse from the dashboard, by a member; another source or no member is refused before anything is sent
+    @Test
+    void should_pulse_a_garage_gate_for_a_member_of_the_dashboard() {
+        when(garageGateService.pulse(148, "Anna")).thenReturn(Mono.empty());
+
+        webTestClient.post().uri("/garage/148/pulse?source=dashboard&member=Anna").exchange()
+            .expectStatus().isNoContent();
+        webTestClient.post().uri("/garage/148/pulse?source=screen&member=Anna").exchange()
+            .expectStatus().isBadRequest();
+        webTestClient.post().uri("/garage/148/pulse?source=dashboard").exchange()
+            .expectStatus().isBadRequest();
+
+        verify(garageGateService).pulse(148, "Anna");
+    }
+
+    @Test
+    void should_answer_the_codes_of_a_refused_pulse() {
+        when(garageGateService.pulse(147, "Anna")).thenReturn(Mono.error(new GateException.GateNotFound(147)));
+        when(garageGateService.pulse(148, "Anna")).thenReturn(Mono.error(new GateException.DeviceFailed("timeout")));
+        when(garageGateService.pulse(149, "Anna")).thenReturn(Mono.error(new GateException.GateUnavailable("auto_off 0")));
+
+        webTestClient.post().uri("/garage/147/pulse?source=dashboard&member=Anna").exchange()
+            .expectStatus().isNotFound();
+        webTestClient.post().uri("/garage/148/pulse?source=dashboard&member=Anna").exchange()
+            .expectStatus().isEqualTo(502)
+            .expectBody().jsonPath("$.errors[0].code").isEqualTo("DEVICE_FAILED");
+        webTestClient.post().uri("/garage/149/pulse?source=dashboard&member=Anna").exchange()
+            .expectStatus().isEqualTo(503);
+    }
+
     @Test
     void should_answer_one_garage_gate_and_404_for_an_id_that_is_none() {
         when(garageGateService.one(148)).thenReturn(Mono.just(
-            new GarageGateReply(148, "Kate", GarageState.CLOSED, SINCE, CONFIRMED, true, true)));
+            new GarageGateReply(148, "Kate", GarageState.CLOSED, SINCE, CONFIRMED, true, true, null)));
         when(garageGateService.one(147)).thenReturn(Mono.error(new GateException.GateNotFound(147)));
 
         webTestClient.get().uri("/garage/148").exchange()

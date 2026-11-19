@@ -5,10 +5,7 @@ import cloud.cholewa.gate.database.GateCommandEntity;
 import cloud.cholewa.gate.database.GateCommandRepository;
 import cloud.cholewa.gate.database.IntercomEventEntity;
 import cloud.cholewa.gate.database.IntercomEventRepository;
-import cloud.cholewa.gate.error.GateException;
 import cloud.cholewa.gate.intercom.BridgeAvailability;
-import cloud.cholewa.gate.registry.HouseholdProfilesClient;
-import cloud.cholewa.home.model.HouseholdProfile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +23,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class GateService {
 
-    private final HouseholdProfilesClient profilesClient;
+    private final HouseholdMembers householdMembers;
     private final GateOpener gateOpener;
     private final GateRegistry gateRegistry;
     private final BridgeAvailability bridgeAvailability;
@@ -34,13 +31,7 @@ public class GateService {
     private final GateCommandRepository gateCommands;
 
     public Mono<Void> openFromDashboard(final String member) {
-        return profilesClient.getProfiles()
-            .onErrorMap(failure -> !(failure instanceof GateException), failure -> new GateException.RegistryUnavailable())
-            .flatMap(profiles -> Mono.justOrEmpty(profiles.stream()
-                .map(HouseholdProfile::getName)
-                .filter(name -> name != null && name.toUpperCase(Locale.ROOT).equals(member.toUpperCase(Locale.ROOT)))
-                .findFirst()))
-            .switchIfEmpty(Mono.error(() -> new GateException.UnknownMember(member)))
+        return householdMembers.known(member)
             .flatMap(name -> gateOpener.open(GateOpener.Source.DASHBOARD, name));
     }
 

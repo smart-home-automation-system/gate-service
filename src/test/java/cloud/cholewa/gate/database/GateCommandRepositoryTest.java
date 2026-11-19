@@ -83,6 +83,23 @@ class GateCommandRepositoryTest {
             .as(StepVerifier::create).verifyError(DataIntegrityViolationException.class);
     }
 
+    //HAS-474, V6: a pulse goes to a garage gate - stored with its id; a pulse without one is refused by its check
+    @Test
+    void should_store_the_pulse_of_a_garage_gate_with_its_gate_only() {
+        repository.save(GateCommandEntity.ofGarage(148, AT, "DASHBOARD", "Anna", GateCommandEntity.PULSED))
+            .flatMap(saved -> repository.findById(saved.id()))
+            .as(StepVerifier::create)
+            .assertNext(read -> {
+                assertThat(read.gateId()).isEqualTo(148L);
+                assertThat(read.outcome()).isEqualTo(GateCommandEntity.PULSED);
+            })
+            .verifyComplete();
+        repository.save(GateCommandEntity.of(AT, "DASHBOARD", "Anna", GateCommandEntity.PULSED))
+            .as(StepVerifier::create)
+            .expectErrorSatisfies(error -> assertThat(error).hasMessageContaining("gate_command_pulse_of_a_garage_gate"))
+            .verify();
+    }
+
     //HAS-450: from included, to not, the newest first
     @Test
     void should_read_the_commands_of_a_period_newest_first() {

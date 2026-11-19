@@ -35,7 +35,8 @@ class GateServiceTest {
     private final BridgeAvailability bridge = new BridgeAvailability();
     private final IntercomEventRepository events = mock(IntercomEventRepository.class);
     private final GateCommandRepository commands = mock(GateCommandRepository.class);
-    private final GateService service = new GateService(profiles, opener, gateRegistry, bridge, events, commands);
+    private final GateService service = new GateService(new HouseholdMembers(profiles), opener, gateRegistry, bridge,
+        events, commands);
 
     private static HouseholdProfile profile(final String name) {
         return HouseholdProfile.builder().name(name).build();

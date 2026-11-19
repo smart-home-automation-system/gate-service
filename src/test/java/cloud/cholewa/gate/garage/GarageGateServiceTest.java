@@ -4,14 +4,19 @@ import cloud.cholewa.gate.api.model.GarageGateReply;
 import cloud.cholewa.gate.error.GateException;
 import cloud.cholewa.gate.gate.GarageGate;
 import cloud.cholewa.gate.gate.GateRegistry;
+import cloud.cholewa.gate.gate.HouseholdMembers;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 //HAS-473: the gates of the registry with what their sensors say - memory only
@@ -24,7 +29,15 @@ class GarageGateServiceTest {
 
     private final GateRegistry gateRegistry = mock(GateRegistry.class);
     private final GarageSensors garageSensors = mock(GarageSensors.class);
-    private final GarageGateService service = new GarageGateService(gateRegistry, garageSensors);
+    private final GaragePulser garagePulser = mock(GaragePulser.class);
+    private final HouseholdMembers householdMembers = mock(HouseholdMembers.class);
+    private final GarageGateService service = new GarageGateService(gateRegistry, garageSensors, garagePulser,
+        householdMembers);
+
+    {
+        //no pulse since the start: the answer leaves the field out
+        when(garagePulser.lastCommandConfirmed(any())).thenReturn(null);
+    }
 
     @Test
     void should_answer_every_garage_gate_with_what_its_sensors_say() {
@@ -35,9 +48,23 @@ class GarageGateServiceTest {
         when(garageSensors.stateOf(KRIS)).thenReturn(new GarageSensors.GarageReading(GarageState.UNKNOWN, null, null));
 
         service.all().as(StepVerifier::create)
-            .expectNext(new GarageGateReply(148, "Kate", GarageState.OPEN, SINCE, CONFIRMED, true, true))
-            .expectNext(new GarageGateReply(149, "Kris", GarageState.UNKNOWN, null, null, false, false))
+            .expectNext(new GarageGateReply(148, "Kate", GarageState.OPEN, SINCE, CONFIRMED, true, true, null))
+            .expectNext(new GarageGateReply(149, "Kris", GarageState.UNKNOWN, null, null, false, false, null))
             .verifyComplete();
+    }
+
+    //HAS-474: the member checked first, as the registry spells the name; an unknown one sends nothing
+    @Test
+    void should_pulse_for_a_known_member_only() {
+        when(householdMembers.known("anna")).thenReturn(Mono.just("Anna"));
+        when(householdMembers.known("Nobody")).thenReturn(Mono.error(new GateException.UnknownMember("Nobody")));
+        when(garagePulser.pulse(148, "Anna")).thenReturn(Mono.empty());
+
+        service.pulse(148, "anna").as(StepVerifier::create).verifyComplete();
+        service.pulse(148, "Nobody").as(StepVerifier::create).verifyError(GateException.UnknownMember.class);
+
+        verify(garagePulser).pulse(148, "Anna");
+        verify(garagePulser, never()).pulse(148, "Nobody");
     }
 
     @Test
@@ -47,7 +74,7 @@ class GarageGateServiceTest {
         when(garageSensors.stateOf(KATE)).thenReturn(new GarageSensors.GarageReading(GarageState.CLOSED, SINCE, CONFIRMED));
 
         service.one(148).as(StepVerifier::create)
-            .expectNext(new GarageGateReply(148, "Kate", GarageState.CLOSED, SINCE, CONFIRMED, true, true))
+            .expectNext(new GarageGateReply(148, "Kate", GarageState.CLOSED, SINCE, CONFIRMED, true, true, null))
             .verifyComplete();
         service.one(147).as(StepVerifier::create).verifyError(GateException.GateNotFound.class);
     }

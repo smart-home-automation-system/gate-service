@@ -69,17 +69,34 @@ public class GarageChangeLog {
     }
 
     //a chain that took no flip for SETTLE is taken out - unless a flip replaced it meanwhile - and written when it ended
-    //on another value than it began with
+    //on another value than it began with. One chain after the other, each taken out only when its turn comes: a pass the
+    //bound cuts off leaves the chains it did not reach where they were, and puts back the one it was writing
     Mono<Void> writeSettledOnce() {
         final Instant now = clock.instant();
         final List<Map.Entry<Long, Pending>> settled = pending.entrySet().stream()
             .filter(chain -> !now.isBefore(chain.getValue().at().plus(SETTLE)))
             .toList();
         return Flux.fromIterable(settled)
-            .filter(chain -> pending.remove(chain.getKey(), chain.getValue()))
-            .filter(chain -> isChange(chain.getKey(), chain.getValue()))
-            .concatMap(chain -> write(chain.getKey(), chain.getValue()))
+            .concatMap(chain -> settle(chain.getKey(), chain.getValue()))
             .then();
+    }
+
+    private Mono<Void> settle(final long sensorId, final Pending chain) {
+        return Mono.defer(() -> pending.remove(sensorId, chain) && isChange(sensorId, chain)
+            ? write(sensorId, chain).doOnCancel(() -> putBack(sensorId, chain))
+            : Mono.empty());
+    }
+
+    //a write the bound of the pass cut off is no failure, so nothing else would tell of it: the next pass writes it,
+    //unless a newer flip of the sensor took its place meanwhile
+    private void putBack(final long sensorId, final Pending chain) {
+        if (pending.putIfAbsent(sensorId, chain) == null) {
+            log.warn("The change of garage sensor {} was cut off by the bound of the pass - written with the next one",
+                sensorId);
+        } else {
+            log.warn("The change of garage sensor {} was cut off by the bound of the pass and a newer flip took its place"
+                + " - not written", sensorId);
+        }
     }
 
     private static boolean isChange(final long sensorId, final Pending chain) {

@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -54,7 +56,7 @@ class GarageChangeLogTest {
         when(gateRegistry.garages()).thenReturn(List.of(
             new GateRegistry.GarageGateState(new GarageGate(148, "Kate", "192.0.2.79", 0, List.of(69L)), 1.0, true, null),
             new GateRegistry.GarageGateState(new GarageGate(149, "Kris", "192.0.2.29", 0, List.of(70L)), 1.0, true, null)));
-        when(repository.save(any())).thenAnswer(saved -> Mono.just(saved.getArgument(0)));
+        doAnswer(saved -> Mono.just(saved.getArgument(0))).when(repository).save(any());
     }
 
     private void flip(final long sensor, final boolean open, final long secondsAfterStart, final Instant openedHeard) {
@@ -116,6 +118,72 @@ class GarageChangeLogTest {
 
         writeAt(5);
         verify(repository).save(GarageGateChangeEntity.of(149, house(0), true, null));
+    }
+
+    //a pass the bound cuts off puts back the change it was writing - the next pass writes it
+    @Test
+    void should_write_a_change_the_bound_cut_off_with_the_next_pass() {
+        doReturn(Mono.never()).when(repository).save(any());
+        flip(69L, true, 0, null);
+
+        now.set(START.plusSeconds(5));
+        log.writeSettledOnce().subscribe().dispose();
+
+        doReturn(Mono.just(GarageGateChangeEntity.of(148, house(0), true, null))).when(repository).save(any());
+        writeAt(10);
+        verify(repository, times(2)).save(GarageGateChangeEntity.of(148, house(0), true, null));
+        writeAt(20);
+        verify(repository, times(2)).save(any());
+    }
+
+    //the chain a cut pass was writing is put back and written again, the one it did not reach stays where it was
+    @Test
+    void should_leave_the_chains_a_cut_pass_did_not_reach() {
+        doReturn(Mono.never()).when(repository).save(any());
+        flip(69L, true, 0, null);
+        flip(70L, true, 0, null);
+
+        now.set(START.plusSeconds(5));
+        log.writeSettledOnce().subscribe().dispose();
+        verify(repository, times(1)).save(any());
+
+        doAnswer(saved -> Mono.just(saved.getArgument(0))).when(repository).save(any());
+        writeAt(10);
+        //whichever of the two the pass took first: three saves, each gate written
+        verify(repository, times(3)).save(any());
+        verify(repository, atLeastOnce()).save(GarageGateChangeEntity.of(148, house(0), true, null));
+        verify(repository, atLeastOnce()).save(GarageGateChangeEntity.of(149, house(0), true, null));
+    }
+
+    //a flip that replaced a settled chain before its turn keeps the new chain: open, then closed while the pass writes
+    //the other sensor - a bounce back, nothing written for it; whichever of the two the pass takes first
+    @Test
+    void should_keep_a_chain_a_flip_replaced_while_the_pass_ran() {
+        flip(69L, true, 0, null);
+        flip(70L, true, 0, null);
+        doAnswer(saved -> {
+            final GarageGateChangeEntity row = saved.getArgument(0);
+            log.logChange(row.gateId() == 148 ? 70L : 69L, false, START.plusSeconds(5), START).block();
+            return Mono.just(saved.getArgument(0));
+        }).when(repository).save(any());
+
+        writeAt(5);
+        verify(repository, times(1)).save(any());
+
+        doAnswer(saved -> Mono.just(saved.getArgument(0))).when(repository).save(any());
+        writeAt(11);
+        verify(repository, times(1)).save(any());
+    }
+
+    //a flip after its chain was written starts a chain of its own, judged from its own value
+    @Test
+    void should_start_a_new_chain_after_one_was_written() {
+        flip(69L, true, 0, null);
+        writeAt(5);
+        flip(69L, false, 30, START);
+        writeAt(35);
+
+        verify(repository).save(GarageGateChangeEntity.of(148, house(30), false, house(0)));
     }
 
     @Test

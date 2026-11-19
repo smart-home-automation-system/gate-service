@@ -101,7 +101,7 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   `writeSettled` every 5 s): the sensor bounces at both ends of the travel (Kate, 2026-11-19 - open, closed, open within
   2 s), so flips within 5 s of each other are one change at the last of them, a closing keeps since the opening before
   the bounce, and a bounce back to where it began writes nothing; the flips waiting are in memory - one within 5 s of a
-  restart is lost; `GET /events` adds them as the kind `garage` (`gate`, `state`, `openForSeconds`) and the
+  restart is lost; a pass the bound (4 s) cuts off puts back the change it was writing (a WARN) and leaves the rest; `GET /events` adds them as the kind `garage` (`gate`, `state`, `openForSeconds`) and the
   pulses among the commands (`gate`); both read into lists before the stream of the station (the pool of 2); the nightly
   retention deletes them with the other tables.
 - **The alarms of a garage gate left open** (HAS-475, `garage/GarageAlarms`, replacing the Shelly cloud scene GARAGE

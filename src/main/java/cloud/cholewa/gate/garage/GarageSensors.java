@@ -222,7 +222,7 @@ public class GarageSensors {
             store.save(change.sensor(), change.reading()),
             Mono.just(change)
                 .filter(Change::flipped)
-                .flatMap(flip -> changeLog.record(flip.sensor(), Boolean.TRUE.equals(flip.reading().open()),
+                .flatMap(flip -> changeLog.logChange(flip.sensor(), Boolean.TRUE.equals(flip.reading().open()),
                     flip.reading().updatedAt(), flip.openedHeard())));
     }
 
@@ -291,13 +291,18 @@ public class GarageSensors {
             }
             final Reading next = next(sensor, held, open, updatedAt, now);
             if (isChange(held, next)) {
-                final boolean flipped = held == null || !Objects.equals(held.open(), next.open());
-                final Instant openedHeard = held != null && Boolean.TRUE.equals(held.open()) && !open ? held.updatedAt() : null;
-                changed.set(new Change(sensor, next, flipped, openedHeard));
+                changed.set(changeOf(sensor, held, next));
             }
             return next;
         });
         return Optional.ofNullable(changed.get());
+    }
+
+    //flipped - another value than the held one; openedHeard - for a closing, when the opening before it was heard
+    private static Change changeOf(final long sensor, final Reading held, final Reading next) {
+        final boolean flipped = held == null || !Objects.equals(held.open(), next.open());
+        final boolean closing = held != null && Boolean.TRUE.equals(held.open()) && Boolean.FALSE.equals(next.open());
+        return new Change(sensor, next, flipped, closing ? held.updatedAt() : null);
     }
 
     //a value not older than the one held; another value than the held one is logged

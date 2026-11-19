@@ -39,6 +39,6 @@ public class GarageGateService {
     private GarageGateReply reply(final GarageGateState gate) {
         final GarageSensors.GarageReading reading = garageSensors.stateOf(gate.gate());
         return new GarageGateReply(gate.gate().id(), gate.gate().name(), reading.state(), reading.since(),
-            reading.confirmedAt(), gate.reachable(), gate.safe(), garagePulser.lastCommandConfirmed(gate.gate()));
+            reading.confirmedAt(), gate.reachable(), gate.safe(), garagePulser.lastCommandConfirmed(gate.gate()).orElse(null));
     }
 }

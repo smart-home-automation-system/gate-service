@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 //The pulse of a garage gate from the dashboard (HAS-474): one "turn on" of the relay of its Shelly 1 - its auto_off ends
@@ -87,19 +88,20 @@ public class GaragePulser {
     }
 
     /**
-     * Whether the last pulse of the gate was answered by its sensor: null - no pulse since the start, its check cancelled
+     * Whether the last pulse of the gate was answered by its sensor: empty - no pulse since the start, its check cancelled
      * by a second pulse, or still within CONFIRM_WITHIN without an answer; true - the sensor heard a change since; false -
      * none within CONFIRM_WITHIN.
      */
-    public Boolean lastCommandConfirmed(final GarageGate gate) {
-        final Pulse pulse = pulses.get(gate.id());
-        if (pulse == null || pulse.cancelled()) {
-            return null;
-        }
-        if (!Objects.equals(garageSensors.stateOf(gate).since(), pulse.sinceBefore())) {
-            return Boolean.TRUE;
-        }
-        return clock.instant().isBefore(pulse.at().plus(CONFIRM_WITHIN)) ? null : Boolean.FALSE;
+    public Optional<Boolean> lastCommandConfirmed(final GarageGate gate) {
+        final LocalDateTime since = garageSensors.stateOf(gate).since();
+        return Optional.ofNullable(pulses.get(gate.id()))
+            .filter(pulse -> !pulse.cancelled())
+            .flatMap(pulse -> Objects.equals(since, pulse.sinceBefore()) ? answerAfter(pulse) : Optional.of(true));
+    }
+
+    //false once CONFIRM_WITHIN passed without an answer, empty while it has not
+    private Optional<Boolean> answerAfter(final Pulse pulse) {
+        return clock.instant().isBefore(pulse.at().plus(CONFIRM_WITHIN)) ? Optional.empty() : Optional.of(false);
     }
 
     private Mono<Void> logCommand(final long id, final LocalDateTime at, final String member, final String outcome) {

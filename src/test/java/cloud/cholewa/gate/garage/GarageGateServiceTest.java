@@ -36,7 +36,7 @@ class GarageGateServiceTest {
 
     {
         //no pulse since the start: the answer leaves the field out
-        when(garagePulser.lastCommandConfirmed(any())).thenReturn(null);
+        when(garagePulser.lastCommandConfirmed(any())).thenReturn(Optional.empty());
     }
 
     @Test

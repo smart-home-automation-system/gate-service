@@ -42,7 +42,7 @@ class GarageChangeLogTest {
 
     @Test
     void should_log_a_closing_with_since_when_the_gate_stood_open() {
-        log.record(69L, false, CLOSED, OPENED).as(StepVerifier::create).verifyComplete();
+        log.logChange(69L, false, CLOSED, OPENED).as(StepVerifier::create).verifyComplete();
 
         verify(repository).save(GarageGateChangeEntity.of(148, LocalDateTime.of(2026, 11, 18, 21, 34, 23), false,
             LocalDateTime.of(2026, 11, 18, 21, 31, 54)));
@@ -51,17 +51,17 @@ class GarageChangeLogTest {
     //an opening has no since; a time the gateway did not give is now
     @Test
     void should_log_an_opening_at_now_when_the_gateway_gave_no_time() {
-        log.record(70L, true, null, OPENED).as(StepVerifier::create).verifyComplete();
+        log.logChange(70L, true, null, OPENED).as(StepVerifier::create).verifyComplete();
 
         verify(repository).save(GarageGateChangeEntity.of(149, LocalDateTime.of(2026, 11, 18, 21, 35), true, null));
     }
 
     @Test
     void should_log_nothing_for_a_sensor_no_gate_names_and_never_fail() {
-        log.record(61L, true, OPENED, null).as(StepVerifier::create).verifyComplete();
+        log.logChange(61L, true, OPENED, null).as(StepVerifier::create).verifyComplete();
         verify(repository, never()).save(any());
 
         doReturn(Mono.error(new IllegalStateException("database down"))).when(repository).save(any());
-        log.record(69L, true, OPENED, null).as(StepVerifier::create).verifyComplete();
+        log.logChange(69L, true, OPENED, null).as(StepVerifier::create).verifyComplete();
     }
 }

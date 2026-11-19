@@ -31,7 +31,7 @@ public class GarageChangeLog {
 
     //heard - when the gateway heard the new value (now when it gave none); openedHeard - for a closing, when the opening
     //before it was heard (null when not known)
-    Mono<Void> record(final long sensorId, final boolean open, final Instant heard, final Instant openedHeard) {
+    Mono<Void> logChange(final long sensorId, final boolean open, final Instant heard, final Instant openedHeard) {
         return Flux.defer(() -> Flux.fromIterable(gateRegistry.garages()))
             .filter(gate -> gate.gate().sensors().contains(sensorId))
             .concatMap(gate -> repository.save(GarageGateChangeEntity.of(gate.gate().id(),

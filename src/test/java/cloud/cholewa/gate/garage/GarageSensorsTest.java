@@ -88,7 +88,7 @@ class GarageSensorsTest {
         when(store.save(anyLong(), any())).thenReturn(Mono.empty());
         when(store.retain(any())).thenReturn(Mono.empty());
         when(store.load()).thenReturn(Flux.empty());
-        when(changeLog.record(anyLong(), anyBoolean(), any(), any())).thenReturn(Mono.empty());
+        when(changeLog.logChange(anyLong(), anyBoolean(), any(), any())).thenReturn(Mono.empty());
     }
 
     private static SmartDevice sensor(final long id, final String address) {
@@ -188,9 +188,9 @@ class GarageSensorsTest {
         sensors.observe(GATEWAY, 202, status(202, false, START.plusSeconds(118))).as(StepVerifier::create).verifyComplete();
         sensors.observe(GATEWAY, 202, status(202, false, START.plusSeconds(119))).as(StepVerifier::create).verifyComplete();
 
-        verify(changeLog).record(69L, true, START.plusSeconds(58), null);
-        verify(changeLog).record(69L, false, START.plusSeconds(118), START.plusSeconds(58));
-        verify(changeLog, never()).record(69L, false, START.plusSeconds(119), null);
+        verify(changeLog).logChange(69L, true, START.plusSeconds(58), null);
+        verify(changeLog).logChange(69L, false, START.plusSeconds(118), START.plusSeconds(58));
+        verify(changeLog, never()).logChange(69L, false, START.plusSeconds(119), null);
     }
 
     //a gateway restarted brings back an older state with its old time: the newer one stays

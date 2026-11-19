@@ -95,16 +95,16 @@ class GaragePulserTest {
 
     @Test
     void should_confirm_a_pulse_its_sensor_answered_and_not_one_it_did_not() {
-        assertThat(pulser.lastCommandConfirmed(KATE)).isNull();
+        assertThat(pulser.lastCommandConfirmed(KATE)).isEmpty();
         pulser.pulse(148, "Anna").as(StepVerifier::create).verifyComplete();
 
         now.set(START.plusSeconds(30));
-        assertThat(pulser.lastCommandConfirmed(KATE)).isNull();
+        assertThat(pulser.lastCommandConfirmed(KATE)).isEmpty();
         now.set(START.plusSeconds(61));
-        assertThat(pulser.lastCommandConfirmed(KATE)).isFalse();
+        assertThat(pulser.lastCommandConfirmed(KATE)).contains(false);
 
         when(garageSensors.stateOf(KATE)).thenReturn(reading(GarageState.OPEN, LocalDateTime.of(2026, 11, 18, 21, 31, 54)));
-        assertThat(pulser.lastCommandConfirmed(KATE)).isTrue();
+        assertThat(pulser.lastCommandConfirmed(KATE)).contains(true);
     }
 
     //a second pulse within the minute cancels the check - a gate stopped half-way reports nothing new
@@ -115,7 +115,7 @@ class GaragePulserTest {
         pulser.pulse(148, "Anna").as(StepVerifier::create).verifyComplete();
         now.set(START.plusSeconds(120));
 
-        assertThat(pulser.lastCommandConfirmed(KATE)).isNull();
+        assertThat(pulser.lastCommandConfirmed(KATE)).isEmpty();
     }
 
     @Test

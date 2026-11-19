@@ -62,6 +62,13 @@ opens the gate, their log and the household told.
   notification-service >= 0.13.0 puts them on the intercom channel, pushes them and texts the first message of an
   alarm to the members named for it. The episodes are kept in `garage_gate_alert`, so a restart neither repeats nor
   loses one. The thresholds are `gate.garage.alarm.*`.
+- **The availability monitor** (HAS-453), every minute on the technical channel (alert / info, no SMS): the bridge of
+  the door station saying offline for 5 min (its `availability` topic - the bridge publishes nothing while nothing happens
+  at the gate, so its silence is never judged), the Shelly of a gate (the driveway gate and the garage gates) not
+  answering its `/status` for 5 min, a relay that does not switch itself off (`auto_off` 0 - at once, the gate is not
+  commanded), a garage gate not known for 5 min (its sensors not confirmed by their gateway). One message a pass names
+  everything that is out, a reminder every hour, an info on the return - also for an alert that never got through.
+  The alerts are kept in `gate_availability_alert`; `gate.monitor.offline-after` / `reminder-every`.
 
 # API
 

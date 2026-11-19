@@ -91,6 +91,11 @@ gate:
       long-after: 30m
       alarm-every: 30m
       warning-every: 60m
+  # the availability monitor (HAS-453): how long the bridge may say offline, a Shelly of a gate go without answering or a
+  # garage gate stay not known before the owner is told on the technical channel, and how often he is told again
+  monitor:
+    offline-after: 5m
+    reminder-every: 60m
 
 # the household told of a ring and an opening (HAS-452): a second connection, to /notification - the exchange lives on
 # another virtual host than the device events (NotificationRabbitConfig). cholewa.notification.enabled of

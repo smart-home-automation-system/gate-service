@@ -43,8 +43,8 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
 - **The opening of the gate** (HAS-449, `gate/`): `GateRegistry` reads the gate of the registry (`?kind=gate&enabled=true`,
   database-service >= 0.26.0) at the start and every 5 min, and the `auto_off` of its relay from the device
   (`GateSettingsClient`, `GET /settings/relay/<channel>` - shelly-client has no read of Gen1 settings); a gate is
-  **safe** only with `auto_off` above 0 - otherwise "turn on" would be a permanent signal to the drive (an ERROR, the
-  alert comes with HAS-453). `GateOpener` sends one `relay(address, channel, true)` of `ShellyGen1Client`, never retried
+  **safe** only with `auto_off` above 0 - otherwise "turn on" would be a permanent signal to the drive (an ERROR, and an
+  alert of the availability monitor). `GateOpener` sends one `relay(address, channel, true)` of `ShellyGen1Client`, never retried
   (no answer: it may have moved); **the slot is taken before the command** - an opening within
   `gate.open.ignore-repeat-for` (PT15S) of the last command sent is `OPEN_TOO_SOON`, so two requests at once send one
   pulse. Every opening, refused ones included, is a row of `gate_command` (V3); a failed write never fails the opening.
@@ -117,6 +117,20 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   gate closed` for every open episode; a gate not known does nothing. **An episode is written only once its message
   was told** (`HouseholdNotifier.garageGate` answers whether the broker confirmed it), so a broker away repeats it the
   next pass. Durations in minutes with bounds, pinned by a test; two times of the house compared in its zone.
+- **The availability monitor** (HAS-453, `monitor/`): every minute (`AvailabilityMonitor`, bounded at 55 s, from 2 min after
+  the start, nothing before the gates are read) `ShellyReachability` reads the `/status` of the Shelly of every gate at once
+  (each bounded at 5 s, its own failure; unreachable since the first pass it did not answer - a WARN, an INFO when back;
+  a `/status` without `wifi_sta` is a failed call), then `AvailabilityEvaluator` (pure) judges: the bridge by its
+  `availability` topic alone (`BridgeAvailability`, offline - its word or the last will of the broker; **no silence of the
+  bridge is judged** - owner 2026-11-19: it publishes nothing while nothing happens at the gate since the motion
+  detection of the station is off; a bridge down before a start is not known until it says something), a Shelly not
+  answering, a relay with `auto_off` 0 (no bound - at once), a garage gate `UNKNOWN`; each but the relay after
+  `gate.monitor.offline-after` (5 min). `gate_availability_alert` (V7, by `item` - `bridge`, `shelly:<id>`,
+  `auto-off:<id>`, `garage:<id>`): a row is written when the alert is due and marked `told` once the broker took it, so
+  an alert that never got through is tried again every pass and still announced with the return; one alert, one
+  reminder (`reminder-every`, 1 h) and one return a pass on the technical channel, naming everything, no SMS (the
+  shape of the monitor of aircon-service). The relay and the garage gate are out since this monitor first saw them so
+  (in memory).
 - **The write is bounded** (30 s) and tried twice more with a backoff, never for a refusal of the schema; a body that
   is not what its topic carries is a WARN and the message is acknowledged.
 - **No picture of the station** (owner, 2026-11-17, HAS-444): the station gives no snapshot over ISAPI or the SDK,

@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -53,9 +54,10 @@ class GarageSensorsTest {
     private final GateRegistry gateRegistry = mock(GateRegistry.class);
     private final ShellyRpcClient rpcClient = mock(ShellyRpcClient.class);
     private final GarageSensorStore store = mock(GarageSensorStore.class);
+    private final GarageChangeLog changeLog = mock(GarageChangeLog.class);
     private final AtomicReference<Instant> now = new AtomicReference<>(START);
     private final GarageSensors sensors = new GarageSensors(registryClient, gateRegistry, rpcClient,
-        JsonMapper.builder().build(), new GarageProperties(Duration.ofMinutes(30)), store, new Clock() {
+        JsonMapper.builder().build(), new GarageProperties(Duration.ofMinutes(30)), store, changeLog, new Clock() {
             @Override
             public ZoneId getZone() {
                 return HOUSE;
@@ -86,6 +88,7 @@ class GarageSensorsTest {
         when(store.save(anyLong(), any())).thenReturn(Mono.empty());
         when(store.retain(any())).thenReturn(Mono.empty());
         when(store.load()).thenReturn(Flux.empty());
+        when(changeLog.logChange(anyLong(), anyBoolean(), any(), any())).thenReturn(Mono.empty());
     }
 
     private static SmartDevice sensor(final long id, final String address) {
@@ -171,6 +174,23 @@ class GarageSensorsTest {
 
         now.set(START.plus(Duration.ofMinutes(31)));
         assertThat(sensors.stateOf(KATE_GATE).state()).isEqualTo(GarageState.UNKNOWN);
+    }
+
+    //HAS-474: a change of the value is logged for the timeline, with since when it stood open; the same value heard
+    //again is stored, never logged as a change
+    @Test
+    void should_log_a_change_of_the_value_for_the_timeline() {
+        gatewayHolds(window(202, KATE, false, START.minusSeconds(3600)));
+        sensors.refresh().as(StepVerifier::create).verifyComplete();
+        now.set(START.plusSeconds(60));
+        sensors.observe(GATEWAY, 202, status(202, true, START.plusSeconds(58))).as(StepVerifier::create).verifyComplete();
+        now.set(START.plusSeconds(120));
+        sensors.observe(GATEWAY, 202, status(202, false, START.plusSeconds(118))).as(StepVerifier::create).verifyComplete();
+        sensors.observe(GATEWAY, 202, status(202, false, START.plusSeconds(119))).as(StepVerifier::create).verifyComplete();
+
+        verify(changeLog).logChange(69L, true, START.plusSeconds(58), null);
+        verify(changeLog).logChange(69L, false, START.plusSeconds(118), START.plusSeconds(58));
+        verify(changeLog, never()).logChange(69L, false, START.plusSeconds(119), null);
     }
 
     //a gateway restarted brings back an older state with its old time: the newer one stays

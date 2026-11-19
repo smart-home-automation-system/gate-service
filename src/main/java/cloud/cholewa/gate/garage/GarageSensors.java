@@ -60,6 +60,7 @@ public class GarageSensors {
     private final JsonMapper jsonMapper;
     private final GarageProperties properties;
     private final GarageSensorStore store;
+    private final GarageChangeLog changeLog;
     private final Clock clock;
 
     //the opening sensors the garage gates name, by their id, as last read
@@ -83,8 +84,10 @@ public class GarageSensors {
         final JsonMapper jsonMapper,
         final GarageProperties properties,
         final GarageSensorStore store,
+        final GarageChangeLog changeLog,
         final Clock clock
     ) {
+        this.changeLog = changeLog;
         this.deviceRegistryClient = deviceRegistryClient;
         this.gateRegistry = gateRegistry;
         this.shellyRpcClient = shellyRpcClient;
@@ -205,12 +208,22 @@ public class GarageSensors {
             .flatMap(store::retain);
     }
 
-    /** A reading of a sensor that changed, to be stored. */
-    record Change(long sensor, Reading reading) {
+    /**
+     * A reading of a sensor that changed, to be stored: {@code flipped} - its value changed (HAS-474: a change of the
+     * gate, logged for the timeline), not only heard again later; {@code openedHeard} - for a closing, when the opening
+     * before it was heard.
+     */
+    record Change(long sensor, Reading reading, boolean flipped, Instant openedHeard) {
     }
 
+    //the reading stored, and a change of the value logged for the timeline - side by side, neither ever failing
     private Mono<Void> storeChange(final Change change) {
-        return store.save(change.sensor(), change.reading());
+        return Mono.when(
+            store.save(change.sensor(), change.reading()),
+            Mono.just(change)
+                .filter(Change::flipped)
+                .flatMap(flip -> changeLog.logChange(flip.sensor(), Boolean.TRUE.equals(flip.reading().open()),
+                    flip.reading().updatedAt(), flip.openedHeard())));
     }
 
     //the window components of the gateway that belong to a sensor of a garage gate, each with what it holds now; a
@@ -278,11 +291,18 @@ public class GarageSensors {
             }
             final Reading next = next(sensor, held, open, updatedAt, now);
             if (isChange(held, next)) {
-                changed.set(new Change(sensor, next));
+                changed.set(changeOf(sensor, held, next));
             }
             return next;
         });
         return Optional.ofNullable(changed.get());
+    }
+
+    //flipped - another value than the held one; openedHeard - for a closing, when the opening before it was heard
+    private static Change changeOf(final long sensor, final Reading held, final Reading next) {
+        final boolean flipped = held == null || !Objects.equals(held.open(), next.open());
+        final boolean closing = held != null && Boolean.TRUE.equals(held.open()) && Boolean.FALSE.equals(next.open());
+        return new Change(sensor, next, flipped, closing ? held.updatedAt() : null);
     }
 
     //a value not older than the one held; another value than the held one is logged

@@ -1,6 +1,7 @@
 package cloud.cholewa.gate.events;
 
 import cloud.cholewa.gate.config.GateRetentionProperties;
+import cloud.cholewa.gate.database.GarageGateChangeRepository;
 import cloud.cholewa.gate.database.GateCommandRepository;
 import cloud.cholewa.gate.database.IntercomEventRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,8 +34,14 @@ class GateRetentionTest {
 
     private final IntercomEventRepository intercomEvents = mock(IntercomEventRepository.class);
     private final GateCommandRepository commands = mock(GateCommandRepository.class);
+    private final GarageGateChangeRepository garageChanges = mock(GarageGateChangeRepository.class);
+
+    {
+        //HAS-474: the changes of the garage gates go the same way, after the commands
+        when(garageChanges.deleteBefore(any())).thenReturn(Mono.just(3L));
+    }
     private final AtomicReference<Instant> now = new AtomicReference<>(NIGHT);
-    private final GateRetention sut = new GateRetention(intercomEvents, commands,
+    private final GateRetention sut = new GateRetention(intercomEvents, commands, garageChanges,
         new GateRetentionProperties(Duration.ofDays(90)), new Clock() {
             @Override
             public ZoneId getZone() {

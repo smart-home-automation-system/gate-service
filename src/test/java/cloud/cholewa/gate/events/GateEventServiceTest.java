@@ -1,6 +1,8 @@
 package cloud.cholewa.gate.events;
 
 import cloud.cholewa.gate.api.model.GateEvent;
+import cloud.cholewa.gate.database.GarageGateChangeEntity;
+import cloud.cholewa.gate.database.GarageGateChangeRepository;
 import cloud.cholewa.gate.database.GateCommandEntity;
 import cloud.cholewa.gate.database.GateCommandRepository;
 import cloud.cholewa.gate.database.IntercomEventEntity;
@@ -10,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,6 +26,28 @@ import static org.mockito.Mockito.when;
 //HAS-450: the timeline of the door station and of the gate, as the house lived it on 2026-11-18
 class GateEventServiceTest {
 
+    //HAS-474: the pulses of a garage gate among the commands, with its gate, and its changes - a closing with how long
+    //the gate stood open; the evening of the test of Kate
+    @Test
+    void should_put_the_pulses_and_the_changes_of_the_garage_gates_on_the_timeline() {
+        final LocalDateTime pulsed = LocalDateTime.of(2026, 11, 18, 21, 31, 47);
+        final LocalDateTime opened = LocalDateTime.of(2026, 11, 18, 21, 31, 54);
+        final LocalDateTime closed = LocalDateTime.of(2026, 11, 18, 21, 34, 23);
+        when(intercomEvents.findInPeriod(FROM, TO)).thenReturn(Flux.empty());
+        when(commands.findInPeriod(FROM, TO)).thenReturn(Flux.just(
+            GateCommandEntity.ofGarage(148, pulsed, "DASHBOARD", "Anna", GateCommandEntity.PULSED)));
+        when(garageChanges.findInPeriod(FROM, TO)).thenReturn(Flux.just(
+            GarageGateChangeEntity.of(148, closed, false, opened),
+            GarageGateChangeEntity.of(148, opened, true, null)));
+
+        service.events(FROM, TO).as(StepVerifier::create)
+            .expectNext(new GateEvent("garage", closed, null, null, null, null, null, null, null, 148L, "closed", 149L))
+            .expectNext(new GateEvent("garage", opened, null, null, null, null, null, null, null, 148L, "open", null))
+            .expectNext(new GateEvent("command", pulsed, null, null, null, null, "dashboard", "Anna", "pulsed", 148L,
+                null, null))
+            .verifyComplete();
+    }
+
     private static final LocalDateTime FROM = LocalDateTime.of(2026, 11, 18, 0, 0);
     private static final LocalDateTime TO = LocalDateTime.of(2026, 11, 19, 0, 0);
     private static final LocalDateTime RING = LocalDateTime.of(2026, 11, 18, 8, 22, 56);
@@ -29,7 +55,13 @@ class GateEventServiceTest {
 
     private final IntercomEventRepository intercomEvents = mock(IntercomEventRepository.class);
     private final GateCommandRepository commands = mock(GateCommandRepository.class);
-    private final GateEventService service = new GateEventService(intercomEvents, commands);
+    private final GarageGateChangeRepository garageChanges = mock(GarageGateChangeRepository.class);
+    private final GateEventService service = new GateEventService(intercomEvents, commands, garageChanges,
+        Clock.system(ZoneId.of("Europe/Warsaw")));
+
+    {
+        when(garageChanges.findInPeriod(any(), any())).thenReturn(Flux.empty());
+    }
 
     //both tables come newest first; the timeline keeps that order across them
     @Test

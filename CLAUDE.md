@@ -87,6 +87,19 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   **`garage_sensor_reading` (V4)** - per sensor, not per gate as the task planned: the last reading, read back at the
   start as not confirmed (`GarageReadingLoader`, the rule of HAS-419/420), an older reading never replaces a newer
   one (the upsert). `GET /garage`, `/garage/{id}` (`NOT_FOUND_GATE`) - memory only, no query.
+- **The pulse of a garage gate and its history** (HAS-474, `garage/GaragePulser`, `GarageChangeLog`): `POST
+  /garage/{id}/pulse?source=dashboard&member=` - the member checked by `HouseholdMembers` (shared with `POST /open` since),
+  one `relay(address, channel, true)`, never retried, **no repeat window** (owner, 2026-11-18: a second press stops the
+  gate half-way); a relay without `auto_off` is `GATE_UNAVAILABLE`. Whether the drive reacted is told by its sensor, not
+  by a clock - the clock of the gateway GRID POWER runs a few seconds ahead of the cluster: the `since` of the gate when the
+  pulse went out is kept, a different one later confirms it, none within 60 s is `lastCommandConfirmed: false`, a second
+  pulse within 60 s cancels the check (null). `gate_command` gains `gate_id` (V6; null for the driveway gate - every row
+  before and every opening of it) and the outcome `PULSED` (only with a gate - `gate_command_pulse_of_a_garage_gate`).
+  `garage_gate_change` (V6): a row for every garage gate that names a sensor whose **value** changed (`GarageSensors`
+  hands `Change.flipped` - the same value heard again is never a change), at the time its gateway heard it, a closing
+  with since when it stood open; `GET /events` adds them as the kind `garage` (`gate`, `state`, `openForSeconds`) and the
+  pulses among the commands (`gate`); both read into lists before the stream of the station (the pool of 2); the nightly
+  retention deletes them with the other tables.
 - **The alarms of a garage gate left open** (HAS-475, `garage/GarageAlarms`, replacing the Shelly cloud scene GARAGE
   NOTIFICATION - its midnight check is not moved, owner 2026-11-18): every minute (bounded at 50 s) the open episodes
   of `garage_gate_alert` (V5, one open per gate and kind - `garage_gate_alert_open_uq`), the temperature outside

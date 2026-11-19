@@ -116,13 +116,13 @@ class AvailabilityMonitorTest {
         when(shelly.status(anyString())).thenReturn(Mono.just(new Gen1DeviceStatus()));
         when(garageSensors.stateOf(any(GarageGate.class), any(LocalDateTime.class)))
             .thenReturn(new GarageReading(GarageState.CLOSED, null, null));
-        when(publisher.publishAlert(anyString())).thenAnswer(call -> record("alert", call.getArgument(0)));
-        when(publisher.publishReminder(anyString())).thenAnswer(call -> record("reminder", call.getArgument(0)));
-        when(publisher.publishInfo(anyString())).thenAnswer(call -> record("info", call.getArgument(0)));
+        when(publisher.publishAlert(anyString())).thenAnswer(call -> remember("alert", call.getArgument(0)));
+        when(publisher.publishReminder(anyString())).thenAnswer(call -> remember("reminder", call.getArgument(0)));
+        when(publisher.publishInfo(anyString())).thenAnswer(call -> remember("info", call.getArgument(0)));
         bridge.report("Call-state", "online", house(0));
     }
 
-    private Mono<Void> record(final String kind, final String text) {
+    private Mono<Void> remember(final String kind, final String text) {
         return Mono.fromRunnable(() -> told.add(kind + ": " + text));
     }
 

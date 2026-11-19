@@ -1,6 +1,8 @@
 package cloud.cholewa.gate.api;
 
+import cloud.cholewa.gate.api.model.GarageAlertReply;
 import cloud.cholewa.gate.api.model.GarageGateReply;
+import cloud.cholewa.gate.garage.GarageAlertService;
 import cloud.cholewa.gate.garage.GarageGateService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -20,19 +22,27 @@ import java.util.List;
 
 //The garage gates (HAS-473): GET /garage - every garage gate of the registry with what its sensors say, by id, an empty
 //list before the first read of the registry; GET /garage/{id} - one, 404 NOT_FOUND_GATE for an id that is no garage
-//gate. POST /garage/{id}/pulse?source=dashboard&member= (HAS-474): 204 once the Shelly took the pulse; 400
-//UNKNOWN_MEMBER, 404 NOT_FOUND_GATE, 502 DEVICE_FAILED (it may have moved all the same), 503 GATE_UNAVAILABLE (a relay
-//that does not switch itself off), 502 REGISTRY_UNAVAILABLE
+//gate. GET /garage/alerts (HAS-454) - the open alarms and warnings, the newest first.
+//POST /garage/{id}/pulse?source=dashboard&member= (HAS-474): 204 once the Shelly took the pulse; 400 UNKNOWN_MEMBER,
+//404 NOT_FOUND_GATE, 502 DEVICE_FAILED (it may have moved all the same), 503 GATE_UNAVAILABLE (a relay that does not
+//switch itself off), 502 REGISTRY_UNAVAILABLE
 @RestController
 @RequestMapping("/garage")
 @RequiredArgsConstructor
 public class GarageController {
 
     private final GarageGateService garageGateService;
+    private final GarageAlertService garageAlertService;
 
     @GetMapping
     public Mono<List<GarageGateReply>> all() {
         return garageGateService.all().collectList();
+    }
+
+    //HAS-454: the open alarms and warnings of the garage gates, the newest first - for the gate page of the dashboard
+    @GetMapping("/alerts")
+    public Mono<List<GarageAlertReply>> alerts() {
+        return garageAlertService.open().collectList();
     }
 
     @GetMapping("/{id}")

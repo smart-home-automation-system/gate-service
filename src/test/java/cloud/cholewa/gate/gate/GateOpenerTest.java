@@ -71,6 +71,16 @@ class GateOpenerTest {
         verify(notifier).gateOpened(GATE, GateOpenSource.SCREEN, null, LocalDateTime.of(2026, 11, 18, 9, 0, 20));
     }
 
+    //HAS-483: the entrance panel - told and logged as the panel, without a member
+    @Test
+    void should_open_the_gate_for_the_panel_and_tell_it() {
+        opener.open(GateOpener.Source.PANEL, null).as(StepVerifier::create).verifyComplete();
+
+        verify(notifier).gateOpened(GATE, GateOpenSource.PANEL, null, LocalDateTime.of(2026, 11, 18, 9, 0));
+        verify(repository).save(
+            GateCommandEntity.of(LocalDateTime.of(2026, 11, 18, 9, 0), "PANEL", null, GateCommandEntity.OPENED));
+    }
+
     //nothing is told of an opening refused or not taken
     @Test
     void should_tell_nothing_of_an_opening_that_did_not_happen() {

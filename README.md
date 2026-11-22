@@ -11,7 +11,7 @@
 
 ![GitHub top language](https://img.shields.io/github/languages/top/smart-home-automation-system/gate-service?style=plastic)
 ![Java](https://img.shields.io/badge/java-21-yellow?style=plastic)
-![SpringBoot](https://img.shields.io/badge/SpringBoot-4.1.2-blue?style=plastic)
+![SpringBoot](https://img.shields.io/badge/SpringBoot-4.1.3-blue?style=plastic)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=smart-home-automation-system_gate-service&metric=coverage)](https://sonarcloud.io/summary/new_code?id=smart-home-automation-system_gate-service)
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=smart-home-automation-system_gate-service&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=smart-home-automation-system_gate-service)
 
@@ -76,7 +76,7 @@ Base path `/home/gate`, routed by the gateway since 0.12.0 (HAS-447) - by path, 
 
 | Method | Path | What it does |
 |---|---|---|
-| `POST` | `/open?source=dashboard&member=<name>` | Opens the gate for a member of the household (checked against the profiles of database-service, any case). `204` once the Shelly took the command; `400 UNKNOWN_MEMBER`, `409 OPEN_TOO_SOON` (within 15 s of the last command), `502 DEVICE_FAILED` (it may have moved all the same), `503 GATE_UNAVAILABLE` (no gate, or a relay that does not switch itself off), `502 REGISTRY_UNAVAILABLE` (the profiles could not be read). No question asked - as the button of the indoor screen. |
+| `POST` | `/open?source=dashboard&member=<name>`, `/open?source=panel` | Opens the gate for a member of the household (checked against the profiles of database-service, any case; `400` without one), or for the entrance panel at the door without a member (since HAS-483 - stored and told as `panel`). `204` once the Shelly took the command; `400 UNKNOWN_MEMBER`, `409 OPEN_TOO_SOON` (within 15 s of the last command), `502 DEVICE_FAILED` (it may have moved all the same), `503 GATE_UNAVAILABLE` (no gate, or a relay that does not switch itself off), `502 REGISTRY_UNAVAILABLE` (the profiles could not be read). No question asked - as the button of the indoor screen. |
 | `GET` | `/` | The gate (`gate`: id, reachable, safe, `autoOffSeconds`, `checkedAt`), the bridge (`bridge`: online, at), the last ring (`lastRing`: at, button) and the last opening (`lastOpening`: at, source, member). A part not known is left out. |
 | `GET` | `/garage` | The garage gates (HAS-473), by id: `id`, `name`, `state` (`open` / `closed` / `unknown`), `since` (when the gateway heard the reading that decides it), `confirmedAt` (when a gateway last stood for its sensors), `reachable` and `safe` of its Shelly. A field not known is left out; an empty list before the first read of the registry. |
 | `GET` | `/garage/{id}` | One garage gate; `404 NOT_FOUND_GATE` for an id that is no garage gate. Since HAS-474 also `lastCommandConfirmed` - whether its sensor answered the last pulse: `false` after 60 s without a change, left out with no pulse, while it is checked or when a second pulse cancelled the check. |

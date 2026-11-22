@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.server.ServerWebInputException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -44,21 +45,39 @@ class GateControllerTest {
 
     @Test
     void should_open_the_gate_from_the_dashboard() {
-        when(gateService.openFromDashboard("Anna")).thenReturn(Mono.empty());
+        when(gateService.open("dashboard", "Anna")).thenReturn(Mono.empty());
 
         webTestClient.post().uri("/open?source=dashboard&member=Anna").exchange().expectStatus().isNoContent();
 
-        verify(gateService).openFromDashboard("Anna");
+        verify(gateService).open("dashboard", "Anna");
     }
 
-    //the screen opens the gate by the unlock of the station, never over HTTP
+    //HAS-483: the entrance panel opens without a member
     @Test
-    void should_refuse_another_source_or_no_member() {
-        webTestClient.post().uri("/open?source=screen&member=Anna").exchange().expectStatus().isBadRequest();
-        webTestClient.post().uri("/open?source=dashboard&member=").exchange().expectStatus().isBadRequest();
-        webTestClient.post().uri("/open?source=dashboard").exchange().expectStatus().isBadRequest();
+    void should_open_the_gate_from_the_panel() {
+        when(gateService.open("panel", null)).thenReturn(Mono.empty());
 
-        verify(gateService, never()).openFromDashboard(any());
+        webTestClient.post().uri("/open?source=panel").exchange().expectStatus().isNoContent();
+
+        verify(gateService).open("panel", null);
+    }
+
+    //the screen opens the gate by the unlock of the station, never over HTTP; the member is checked by the service
+    @Test
+    void should_refuse_another_source() {
+        webTestClient.post().uri("/open?source=screen&member=Anna").exchange().expectStatus().isBadRequest();
+        webTestClient.post().uri("/open").exchange().expectStatus().isBadRequest();
+
+        verify(gateService, never()).open(any(), any());
+    }
+
+    //the dashboard without a member, refused by the service (HAS-483) - a 400, never a 500
+    @Test
+    void should_answer_a_missing_member_of_the_dashboard_with_a_bad_request() {
+        when(gateService.open("dashboard", null))
+            .thenReturn(Mono.error(new ServerWebInputException("member is required for the dashboard")));
+
+        webTestClient.post().uri("/open?source=dashboard").exchange().expectStatus().isBadRequest();
     }
 
     static Stream<Arguments> refusals() {
@@ -74,7 +93,7 @@ class GateControllerTest {
     @MethodSource("refusals")
     void should_answer_a_refusal_with_its_status_and_code(final GateException refusal, final HttpStatus status,
                                                           final String code) {
-        when(gateService.openFromDashboard("Anna")).thenReturn(Mono.error(refusal));
+        when(gateService.open("dashboard", "Anna")).thenReturn(Mono.error(refusal));
 
         webTestClient.post().uri("/open?source=dashboard&member=Anna").exchange()
             .expectStatus().isEqualTo(status)

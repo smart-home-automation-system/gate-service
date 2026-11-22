@@ -81,6 +81,15 @@ class GateCommandRepositoryTest {
             .as(StepVerifier::create).verifyError(DataIntegrityViolationException.class);
         repository.save(GateCommandEntity.of(AT, "DASHBOARD", null, GateCommandEntity.OPENED))
             .as(StepVerifier::create).verifyError(DataIntegrityViolationException.class);
+        repository.save(GateCommandEntity.of(AT, "PANEL", "Anna", GateCommandEntity.OPENED))
+            .as(StepVerifier::create).verifyError(DataIntegrityViolationException.class);
+    }
+
+    //HAS-483, V8: the entrance panel, without a member
+    @Test
+    void should_store_an_opening_from_the_panel() {
+        repository.save(GateCommandEntity.of(AT, "PANEL", null, GateCommandEntity.OPENED))
+            .as(StepVerifier::create).expectNextCount(1).verifyComplete();
     }
 
     //HAS-474, V6: a pulse goes to a garage gate - stored with its id; a pulse without one is refused by its check

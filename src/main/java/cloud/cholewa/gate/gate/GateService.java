@@ -9,10 +9,12 @@ import cloud.cholewa.gate.intercom.BridgeAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ServerWebInputException;
 import reactor.core.publisher.Mono;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Function;
 
 //What the API does (HAS-449): the opening from the dashboard - the member checked against the household profiles of
 //database-service, then the gate opened as GateOpener does - and the read of the gate. The member is stored as the
@@ -23,6 +25,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class GateService {
 
+    private static final String PANEL = "panel";
+
     private final HouseholdMembers householdMembers;
     private final GateOpener gateOpener;
     private final GateRegistry gateRegistry;
@@ -30,8 +34,21 @@ public class GateService {
     private final IntercomEventRepository intercomEvents;
     private final GateCommandRepository gateCommands;
 
+    //POST /open (HAS-483): the entrance panel opens without a member (one sent with it is not stored), the dashboard only
+    //with a member of the household
+    public Mono<Void> open(final String source, final String member) {
+        return Mono.just(source)
+            .filter(PANEL::equals)
+            .map(panel -> gateOpener.open(GateOpener.Source.PANEL, null))
+            .defaultIfEmpty(Mono.defer(() -> openFromDashboard(member)))
+            .flatMap(Function.identity());
+    }
+
     public Mono<Void> openFromDashboard(final String member) {
-        return householdMembers.known(member)
+        return Mono.justOrEmpty(member)
+            .filter(name -> !name.isBlank())
+            .switchIfEmpty(Mono.error(() -> new ServerWebInputException("member is required for the dashboard")))
+            .flatMap(householdMembers::known)
             .flatMap(name -> gateOpener.open(GateOpener.Source.DASHBOARD, name));
     }
 

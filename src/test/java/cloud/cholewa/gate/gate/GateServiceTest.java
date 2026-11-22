@@ -11,6 +11,7 @@ import cloud.cholewa.gate.registry.HouseholdProfilesClient;
 import cloud.cholewa.gate.registry.RegistryCallException;
 import cloud.cholewa.home.model.HouseholdProfile;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ServerWebInputException;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -23,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class GateServiceTest {
@@ -49,6 +51,37 @@ class GateServiceTest {
         when(opener.open(any(), any())).thenReturn(Mono.empty());
 
         service.openFromDashboard("anna").as(StepVerifier::create).verifyComplete();
+
+        verify(opener).open(GateOpener.Source.DASHBOARD, "Anna");
+    }
+
+    //HAS-483: the entrance panel opens without a member and without reading the profiles; a member sent with it is not
+    //stored
+    @Test
+    void should_open_the_gate_for_the_panel_without_a_member() {
+        when(opener.open(any(), any())).thenReturn(Mono.empty());
+
+        service.open("panel", "Anna").as(StepVerifier::create).verifyComplete();
+
+        verify(opener).open(GateOpener.Source.PANEL, null);
+        verifyNoInteractions(profiles);
+    }
+
+    //the member of the dashboard, checked here since HAS-483 (the controller takes the panel without one)
+    @Test
+    void should_refuse_the_dashboard_without_a_member() {
+        service.open("dashboard", null).as(StepVerifier::create).verifyError(ServerWebInputException.class);
+        service.open("dashboard", " ").as(StepVerifier::create).verifyError(ServerWebInputException.class);
+
+        verify(opener, never()).open(any(), any());
+    }
+
+    @Test
+    void should_open_the_gate_for_the_dashboard_through_open() {
+        when(profiles.getProfiles()).thenReturn(Mono.just(List.of(profile("Anna"))));
+        when(opener.open(any(), any())).thenReturn(Mono.empty());
+
+        service.open("dashboard", "anna").as(StepVerifier::create).verifyComplete();
 
         verify(opener).open(GateOpener.Source.DASHBOARD, "Anna");
     }

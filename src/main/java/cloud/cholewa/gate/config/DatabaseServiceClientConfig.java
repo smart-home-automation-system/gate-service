@@ -10,8 +10,8 @@ import reactor.netty.resources.ConnectionProvider;
 
 import java.time.Duration;
 
-//The client of database-service (the device registry, the household profiles) and the client of the settings of the
-//Shelly of the gate. Built from the injected builder, so the calls are traced and logged by Logbook (cholewa-commons >=
+//The client of database-service (the device registry, the household profiles), of weather-service, presence-service and
+//amx-service, and the client of the settings of the Shelly of the gate. Built from the injected builder, so the calls are traced and logged by Logbook (cholewa-commons >=
 //1.10.0); the timeouts keep a silent service or device from holding a pass or a request
 @Configuration
 public class DatabaseServiceClientConfig {
@@ -66,6 +66,21 @@ public class DatabaseServiceClientConfig {
         final InternalServicesProperties services
     ) {
         return client(webClientBuilder, presenceServiceConnectionProvider).baseUrl(services.presence().toString()).build();
+    }
+
+    //amx-service (HAS-485): the entrance panel woken by a ring - its own pool
+    @Bean(destroyMethod = "dispose")
+    ConnectionProvider amxServiceConnectionProvider() {
+        return connectionProvider("amx-service");
+    }
+
+    @Bean
+    WebClient amxServiceWebClient(
+        final WebClient.Builder webClientBuilder,
+        final ConnectionProvider amxServiceConnectionProvider,
+        final InternalServicesProperties services
+    ) {
+        return client(webClientBuilder, amxServiceConnectionProvider).baseUrl(services.amx().toString()).build();
     }
 
     //the settings of the Shelly of the gate, read at its address of the registry - its own pool

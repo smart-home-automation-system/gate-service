@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 //device of the house, about 130 a minute: what is not a topic of the bridge for the station of this service is dropped
 //first, without a word. Of the bridge (deployment-tools/scripts/hikvision/devices.md):
 //- Call-state attributes {"device_number": ...} come right before "ringing" - the button, kept for the ring;
-//- Call-state "ringing" is a ring - stored and told to the household at once (HAS-452), "dismissed" the end of a call (not answered, rejected or hung up alike), "idle"
+//- Call-state "ringing" is a ring - stored, told to the household at once (HAS-452) and the entrance panel woken (HAS-485), "dismissed" the end of a call (not answered, rejected or hung up alike), "idle"
 //  nothing - the bridge says it after every end and 60 s after every ring;
 //- the attributes of Door-<n>-relay are an unlock of the door n: one pulse of the relay (ON, then OFF), stored once
 //  and handed to ScreenOpening, which opens the gate for an unlock of an indoor screen (the owner, 2026-11-17: every
@@ -53,6 +53,7 @@ public class IntercomEventRouter {
     private final IntercomEventService service;
     private final ScreenOpening screenOpening;
     private final HouseholdNotifier householdNotifier;
+    private final EntrancePanel entrancePanel;
     private final BridgeAvailability availability;
     private final IntercomProperties properties;
     private final JsonMapper jsonMapper;
@@ -104,9 +105,10 @@ public class IntercomEventRouter {
             return Mono.empty();
         }
         return switch (payload) {
-            //the household is told whatever the write of the ring comes to
+            //the household is told and the panel woken whatever the write of the ring comes to - all three at once;
+            //the panel on every ring, not behind the window of the household message
             case RINGING -> Mono.when(service.store(IntercomEventEntity.ring(now, lastButton.getAndSet(null))),
-                householdNotifier.doorbell(now));
+                householdNotifier.doorbell(now), entrancePanel.ring(now));
             case DISMISSED -> service.store(IntercomEventEntity.dismissed(now));
             case IDLE -> Mono.empty();
             default -> Mono.fromRunnable(() -> log.warn("A call state of the station this service does not know: {}",

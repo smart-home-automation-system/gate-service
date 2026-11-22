@@ -115,6 +115,8 @@ internal:
     # the temperature outside and who is at home - the alarms of the garage gates (HAS-475)
     weather: http://weather-service:6200
     presence: http://presence-service:6200
+    # the entrance panel woken by a ring (HAS-485)
+    amx: http://amx-service:6200
 
 cholewa:
   # refuses the start before the first bean when one of these has no value (cholewa-commons >= 1.9.0)
@@ -181,6 +183,7 @@ internal:
     database: http://localhost:6005
     weather: http://localhost:6010
     presence: http://localhost:6009
+    amx: http://localhost:6001
 
 server:
   port: 6016
@@ -226,6 +229,7 @@ internal:
     database: http://localhost:1
     weather: http://localhost:1
     presence: http://localhost:1
+    amx: http://localhost:1
 
 # the pool opens nothing eagerly, and Flyway is off: a context test never reaches a database
 database:

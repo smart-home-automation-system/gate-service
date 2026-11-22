@@ -13,7 +13,8 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
 - Talks to: the intercom events on `device.prod.gate` of `/device` (HAS-448, the contract in
   `deployment-tools/scripts/hikvision/devices.md`), the Shelly 1 of the gate over HTTP (HAS-449), the household
   category of the notification exchange over a second connection to `/notification` (HAS-452, user `notification`,
-  `notification-rabbitmq-password`; `NotificationRabbitConfig` - one more copy of the config kept per service); routed by the gateway under `/gate` (HAS-447).
+  `notification-rabbitmq-password`; `NotificationRabbitConfig` - one more copy of the config kept per service), amx-service
+  for the entrance panel woken by a ring (HAS-485, `internal.service.amx`); routed by the gateway under `/gate` (HAS-447).
 - Uses libraries: cholewa-commons, smart-home-sdk, shelly-client.
 - Database: own database `home-automation-gate`, 2 of the 47 connections of the managed PostgreSQL.
 - Integrates with hardware: the Hikvision door station (through the bridge, never directly), the Shelly 1 Gen1 of
@@ -75,6 +76,12 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   `member`, the gate of the registry its subject (`GateDevice.name`). A publish is cut off after 30 s and every error is a
   WARN - nothing told ever fails or holds the opening (the dashboard waits for the confirm of the broker, ms, at most
   30 s); the ring is told while it is written (`Mono.when`).
+- **The entrance panel woken by a ring** (HAS-485, epic HAS-479, `intercom/EntrancePanel`): at every `ringing` the
+  router calls `POST /home/amx/panel/doorbell` of amx-service (>= 2.6.0, over k8s DNS, `internal.service.amx`, its own
+  pool) at once, beside the write of the ring and the household message (`Mono.when`) - **on every ring, not behind
+  the 60 s window of the household message**: a second press wakes a panel that went to sleep. Bounded at 5 s, every
+  failure a WARN and swallowed - a 503 of amx-service (the Office master or its panel server away) is no alert, and
+  amx-service down leaves the ring stored and told as before. The panel shows the doorbell page only - no sound, ever.
 - **The garage gates** (HAS-473, `garage/`): a gate of the registry with `openingSensors` (database-service >= 0.27.0) is
   a garage gate (`GarageGate`), the driveway gate is the lowest id of the gates without one - `GateRegistry` keeps them
   apart in one read of `?kind=gate&enabled=true`, each garage gate with the `auto_off` of its relay

@@ -42,7 +42,9 @@ class IntercomEventRouterTest {
     private final BridgeAvailability availability = new BridgeAvailability();
     private final ScreenOpening screenOpening = mock(ScreenOpening.class);
     private final HouseholdNotifier notifier = mock(HouseholdNotifier.class);
-    private final IntercomEventRouter router = new IntercomEventRouter(service, screenOpening, notifier, availability,
+    private final EntrancePanel entrancePanel = mock(EntrancePanel.class);
+    private final IntercomEventRouter router = new IntercomEventRouter(service, screenOpening, notifier, entrancePanel,
+        availability,
         new IntercomProperties("gate", ZoneId.of("UTC")), JsonMapper.builder().build(), CLOCK);
 
     @BeforeEach
@@ -50,6 +52,18 @@ class IntercomEventRouterTest {
         when(service.store(any())).thenReturn(Mono.empty());
         when(screenOpening.onUnlock(any(), any(), any())).thenReturn(Mono.empty());
         when(notifier.doorbell(any())).thenReturn(Mono.empty());
+        when(entrancePanel.ring(any())).thenReturn(Mono.empty());
+    }
+
+    //HAS-485: every ring wakes the entrance panel, the time it was heard - not behind the window of the household
+    //message; a dismissed call does not
+    @Test
+    void should_wake_the_entrance_panel_on_every_ring() {
+        route("hmd.sensor.gate.Call-state.state", "ringing");
+        route("hmd.sensor.gate.Call-state.state", "dismissed");
+        route("hmd.sensor.gate.Call-state.state", "ringing");
+
+        verify(entrancePanel, times(2)).ring(NOW);
     }
 
     //HAS-452: a ring is told to the household at once, the time it was heard; a dismissed call is not

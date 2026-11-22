@@ -48,6 +48,10 @@ opens the gate, their log and the household told.
   pushed by notification-service to every member and opening the gate page of the dashboard - and every opening of the
   gate as `gate opened` with where from and who, on the intercom channel of Discord; never by SMS. A notification never
   fails nor holds the opening of the gate.
+- **The entrance panel woken** (HAS-485): every ring - not only the first of a call - asks amx-service
+  (`POST /home/amx/panel/doorbell`) to wake the AMX panel at the door and show its doorbell page, without a sound. Bounded
+  at 5 s; a failure (amx-service, the Office master or its panel server away) is a line in the log, and the ring is
+  stored and told all the same.
 - **The garage gates** (HAS-473): a gate of the registry with `openingSensors` is a garage gate - the driveway gate
   is the one without. The state of each is read from the Shelly BLU Door/Window sensor on it, through the BTHome
   gateway that hears it (`Shelly.GetComponents` every 5 min and the `bthomesensor` status topics between): open,
@@ -91,7 +95,8 @@ Base path `/home/gate`, routed by the gateway since 0.12.0 (HAS-447) - by path, 
 - Own database `home-automation-gate`, pool 2: `database-host`, `database-port`, `database-name`, `database-user`,
   `database-password` and `flyway-url`; `database-password` is mandatory (`cholewa.required-properties`), the rest
   falls back to `localhost` / dummy values that fail on Flyway.
-- The services of the cluster: `internal.service.database`, `.weather`, `.presence` (locally `6005`, `6010`, `6009`).
+- The services of the cluster: `internal.service.database`, `.weather`, `.presence`, `.amx` (locally `6005`, `6010`,
+  `6009`, `6001`).
 - The broker: `rabbitmq-password` (user `device`, mandatory); the local profile consumes `device.dev.gate` on
   `localhost`. The household messages: `notification-rabbitmq-password` (user `notification`, mandatory), `env: dev`
   locally - `notification.dev.household`. database-service: `internal.service.database` (`localhost:6005` locally). **A local run with the real

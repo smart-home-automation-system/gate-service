@@ -2,8 +2,8 @@
 
 The driveway gate and the intercom of the house (epic HAS-442): the events of the Hikvision door station at the
 gate, the command of the Shelly that opens the gate, their log and the household told. The scaffold of HAS-446,
-from the scaffold of aircon-service (itself from energy-service and water-service): Spring Boot 4.1.2,
-cholewa-commons 1.14.0, smart-home-sdk 1.23.0 (HAS-473), shelly-client 2.7.0 with its beans on; port 6016 / 8016 locally,
+from the scaffold of aircon-service (itself from energy-service and water-service): Spring Boot 4.1.3,
+cholewa-commons 1.14.0, smart-home-sdk 1.25.0 (HAS-483), shelly-client 2.7.0 with its beans on; port 6016 / 8016 locally,
 6200 / 8200 in the cluster, base path `/home/gate`; own database `home-automation-gate`, pool 2, `V1` an empty
 baseline; `database-password` mandatory; scheduling off under `test`; the Deployment `Recreate`, never scaled
 (state in memory will follow). Org-wide rules: `organization-repository/claude/organization.md`.
@@ -54,7 +54,11 @@ baseline; `database-password` mandatory; scheduling off under `test`; the Deploy
   through a restart opens nothing) and newer than the last unlock that opened it (the bridge publishing it again). A
   card, a code or another source is stored and opens nothing.
 - **The API**: `POST /open?source=dashboard&member=` (the member checked against the profiles, any case, stored as the
-  registry spells it), `GET /` and `GET /events?from=&to=` (HAS-450, `GateEventService`: `intercom_event` and
+  registry spells it) and since HAS-483 `POST /open?source=panel` - the entrance panel at the door (epic HAS-479; amx-service
+  calls it when the panel asks), without a member (one sent with it is not stored), `gate opened` told with `source:
+  panel` (notification-service >= 0.15.0 words it), the repeat window shared with the screen and the dashboard; the check
+  of the member moved from the controller into `GateService.open` (`400` without one for the dashboard). `gate_command`
+  takes `PANEL` since **V8** (rehearsed on a throwaway PostgreSQL: 0.10.0 starts over V8), `GET /` and `GET /events?from=&to=` (HAS-450, `GateEventService`: `intercom_event` and
   `gate_command` read newest first and merged by `Flux.mergeComparing`, the commands first into a list so that the
   read holds one connection of the pool of 2 at a time; at most 31 days,
   `INVALID_RANGE`); the codes of `GateError` are wire contract for the dashboard (`GateErrorTest`).

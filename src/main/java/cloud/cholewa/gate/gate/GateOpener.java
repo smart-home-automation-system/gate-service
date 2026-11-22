@@ -29,7 +29,8 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class GateOpener {
 
-    public enum Source { SCREEN, DASHBOARD }
+    //the entrance panel at the door since HAS-483
+    public enum Source { SCREEN, DASHBOARD, PANEL }
 
     //the Shelly answers within its response timeout; this bounds a call that hangs below it
     static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(10);
@@ -82,6 +83,7 @@ public class GateOpener {
         return switch (source) {
             case SCREEN -> GateOpenSource.SCREEN;
             case DASHBOARD -> GateOpenSource.DASHBOARD;
+            case PANEL -> GateOpenSource.PANEL;
         };
     }
 

@@ -4,7 +4,6 @@ import cloud.cholewa.gate.api.model.GateEvent;
 import cloud.cholewa.gate.api.model.GateReply;
 import cloud.cholewa.gate.events.GateEventService;
 import cloud.cholewa.gate.gate.GateService;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
@@ -35,13 +34,15 @@ public class GateController {
     private final GateService gateService;
     private final GateEventService gateEventService;
 
+    //the dashboard by a member, or the entrance panel at the door without one (HAS-483) - the member checked by the service
     @PostMapping("/open")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public Mono<Void> open(
-        @RequestParam @Pattern(regexp = "dashboard", message = "source must be dashboard") final String source,
-        @RequestParam @NotBlank @Size(max = 50) final String member
+        @RequestParam @Pattern(regexp = "dashboard|panel", message = "source must be dashboard or panel")
+        final String source,
+        @RequestParam(required = false) @Size(max = 50) final String member
     ) {
-        return gateService.openFromDashboard(member);
+        return gateService.open(source, member);
     }
 
     @GetMapping

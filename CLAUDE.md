@@ -2,11 +2,18 @@
 
 The driveway gate and the intercom of the house (epic HAS-442): the events of the Hikvision door station at the
 gate, the command of the Shelly that opens the gate, their log and the household told. The scaffold of HAS-446,
-from the scaffold of aircon-service (itself from energy-service and water-service): Spring Boot 4.1.3,
-cholewa-commons 1.14.0, smart-home-sdk 1.25.0 (HAS-483), shelly-client 2.7.0 with its beans on; port 6016 / 8016 locally,
+from the scaffold of aircon-service (itself from energy-service and water-service): Spring Boot 4.2.0,
+cholewa-commons 2.0.0, smart-home-sdk 1.26.0 (HAS-513), shelly-client 2.7.0 with its beans on; port 6016 / 8016 locally,
 6200 / 8200 in the cluster, base path `/home/gate`; own database `home-automation-gate`, pool 2, `V1` an empty
 baseline; `database-password` mandatory; scheduling off under `test`; the Deployment `Recreate`, never scaled
 (state in memory will follow). Org-wide rules: `organization-repository/claude/organization.md`.
+
+Versions since HAS-513: Spring Boot 4.2.0, cholewa-commons 2.0.0, smart-home-sdk 1.26.0 (`MemberPermission.AMPLIFIER_UNLOCK` -
+`HouseholdProfile.permissions` is a list of the enum, so a permission the SDK does not know fails the check of a member),
+shelly-client 2.7.0. Boot 4.2 moved the classic RabbitMQ support to `spring-boot-starter-rabbitmq` and
+`org.springframework.boot.rabbitmq.autoconfigure`; `NotificationRabbitConfig` takes the host and port of the broker from
+`RabbitConnectionDetails` (`getFirstAddress()`), never `RabbitProperties.determineHost` / `determinePort` (deprecated for
+removal). The plugins the Boot parent manages carry no version of their own.
 
 ## Role in the system
 
